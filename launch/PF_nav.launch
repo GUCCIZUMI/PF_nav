@@ -27,7 +27,7 @@
       </node>
 
       <node pkg="PF_nav" name="PF_nav_MarkerArray" type="PF_nav_MarkerArray" output="screen">
-         <rosparam command="load" file="$(find PF_nav)/yaml/markers.yaml"/>
+         <rosparam command="load" file="$(find PF_nav)/yaml/markers_2.yaml"/>
       </node>
      
      <node pkg="PF_nav" name="PF_nav_Visualization" type="PF_nav_Visualization" output="screen">
