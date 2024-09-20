@@ -1,12 +1,14 @@
 #include <ros/ros.h>
-#include <potbot_lib/DiffDriveController.h>
+#include <potbot_lib/utility_ros.h>
+#include <potbot_lib/pid.h>
 #include <potbot_msgs/ObstacleArray.h>
 #include <dynamic_reconfigure/server.h>
 #include <PF_nav/PF_navConfig.h>
 #include <geometry_msgs/PoseArray.h>
+#include <nav_msgs/Odometry.h>
 #include <random>
 
-std::vector<potbot_lib::Controller::DiffDriveController> g_robot;
+std::vector<potbot_lib::controller::PID> g_robot;
 std::random_device g_rd;
 std::default_random_engine g_generator(g_rd());
 double g_norm_noise_mean_initial_particle_X = 0; //初期パーティクルに載せる正規分布平均(初期設定)
@@ -28,14 +30,15 @@ void init_particles()
     for (size_t i = 1; i < g_robot.size(); i++){
 		
 		nav_msgs::Odometry particle;
-		g_robot[i].to_msg(particle);
+		potbot_lib::utility::to_msg(g_robot[i], particle);	// <- g_robot[i].to_msg(particle);
+		
 		
 		particle.pose.pose.position.x += distribution_initial_particle_X(g_generator);
 		particle.pose.pose.position.y += distribution_initial_particle_Y(g_generator);
-		double yaw = potbot_lib::utility::get_Yaw(particle.pose.pose.orientation) + distribution_initial_particle_yaw(g_generator);
-        particle.pose.pose.orientation = potbot_lib::utility::get_Quat(0,0,yaw);
+		double yaw = tf2::getYaw(particle.pose.pose.orientation) + distribution_initial_particle_yaw(g_generator);
+        particle.pose.pose.orientation = potbot_lib::utility::get_quat(0,0,yaw);
 
-		g_robot[i].set_msg(particle);
+		potbot_lib::utility::to_agent(particle, g_robot[i]) ; // <- g_robot[i].set_msg(particle);
 	}
     //---------------------------------------------------------------------------------------------------------------------------------------------------------------
 }
@@ -46,27 +49,31 @@ void inipose_callback(const geometry_msgs::PoseWithCovarianceStamped& msg)
 	nav_msgs::Odometry ini_pose;
 	ini_pose.header.frame_id = "map" ;
 	ini_pose.pose = msg.pose;
-	for (auto& robo : g_robot) robo.set_msg(ini_pose); //ランダムでrobotの状態を設定、そのすべてにroboでアクセスオドメトリ等の定義設定
+	for (auto& robo : g_robot) potbot_lib::utility::to_agent(ini_pose, robo); //ランダムでrobotの状態を設定、そのすべてにroboでアクセスオドメトリ等の定義設定
 	init_particles();
 }
 
 void goal_callback(const geometry_msgs::PoseStamped& msg)
 {
-	g_robot[0].set_target(	msg.pose.position.x,
-							msg.pose.position.y,
-							potbot_lib::utility::get_Yaw(msg.pose.orientation));
+	g_robot[0].setTargetPoint(
+		potbot_lib::Pose{
+			msg.pose.position.x,
+			msg.pose.position.y,0,0,0,
+			tf2::getYaw(msg.pose.orientation)
+			}
+		);
 }
 
 void param_callback(const PF_nav::PF_navConfig& param, uint32_t level)
 {
-	g_robot[0].set_gain(	param.gain_p,
-							param.gain_i,
-							param.gain_d);
+	g_robot[0].setGain(	param.gain_p,
+						param.gain_i,
+						param.gain_d);
 
-	g_robot[0].set_margin(	param.stop_margin_angle,
+	g_robot[0].setMargin(	param.stop_margin_angle,
 							param.stop_margin_distance);
 
-	g_robot[0].set_limit(	param.max_linear_velocity,
+	g_robot[0].setLimit(	param.max_linear_velocity,
 							param.max_angular_velocity);
 }
 
@@ -135,7 +142,7 @@ int main(int argc,char **argv){
 
 	nav_msgs::Odometry robot_pose; //robot_pose定義(odometry型)
 	robot_pose.header.frame_id = "map";
-	robot_pose.pose.pose = potbot_lib::utility::get_Pose(0,0,0,0,0,0);	//ロボット初期位置 x y z r p y
+	robot_pose.pose.pose = potbot_lib::utility::get_pose(0,0,0,0,0,0);	//ロボット初期位置 x y z r p y
 
 	geometry_msgs::PoseArray particles_msg; //particle_msg定義(PoseArrey型)
 	particles_msg.header.frame_id = robot_pose.header.frame_id; //tfに関することなんだろうけど詳しくは小池さんに聞いて(mapに設定してる)
@@ -145,7 +152,7 @@ int main(int argc,char **argv){
 	for (auto& robo : g_robot)
 	{
 		robo.deltatime = 1.0/control_frequency;;
-		robo.set_msg(robot_pose);
+		potbot_lib::utility::to_agent(robot_pose, robo);
 	}
 
 	init_particles();
@@ -153,7 +160,7 @@ int main(int argc,char **argv){
 	for (size_t i = 0; i < particle_num; i++) 
 	{
 		nav_msgs::Odometry odom;
-		g_robot[i+1].to_msg(odom);
+		potbot_lib::utility::to_msg(g_robot[i+1], odom);
 		particles_msg.poses.push_back(odom.pose.pose);
 		potbot_msgs::Obstacle p;
 		p.pose = odom.pose.pose;
@@ -169,10 +176,10 @@ int main(int argc,char **argv){
 	while (ros::ok())
 	{
 
-		g_robot[0].pid_control();
+		g_robot[0].calculateCommand();
 		g_robot[0].update();
 		
-		g_robot[0].to_msg(robot_pose);
+		potbot_lib::utility::to_msg(g_robot[0], robot_pose);
 
 		particles_msg.header = robot_pose.header;
 		particle_state_msg.header = robot_pose.header;
@@ -189,10 +196,10 @@ int main(int argc,char **argv){
 				//double v_noise = v_truth + distribution_linear_velocity(generator);
 				//double omega_noise = omega_truth + distribution_angular_velocity(generator);
 				nav_msgs::Odometry particle;
-				g_robot[i].to_msg(particle);
+				potbot_lib::utility::to_msg(g_robot[i], particle);
 				particle.twist.twist.linear.x = v_noise;
 				particle.twist.twist.angular.z = omega_noise;
-				g_robot[i].set_msg(particle);
+				potbot_lib::utility::to_agent(particle, g_robot[i]);
 				g_robot[i].update();
 
 				//観測モデル実装予定(関数定義にするかも)---------------------------------------------------------------------------------------------------------------

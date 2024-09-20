@@ -78,7 +78,7 @@ void PFVisualization::robotPoseCallback(const nav_msgs::Odometry& odom_pose)
     robot_pose_y_ = odom_pose.pose.pose.position.y;
     robot_pose_z_ = odom_pose.pose.pose.position.z;
 
-    robot_pose_yaw_ = potbot_lib::utility::get_Yaw(odom_pose.pose.pose.orientation);
+    robot_pose_yaw_ = tf2::getYaw(odom_pose.pose.pose.orientation);
     
     if (sebscribed_landmark_pose_ && sebscribed_robot_pose_)
     {
@@ -121,7 +121,7 @@ void PFVisualization::updateParticles()
         p.update();
 
         nav_msgs::Odometry p_msg;
-        p.to_msg(p_msg);
+        potbot_lib::utility::to_msg(p, p_msg); //p.to_msg(p_msg);
         particles_msg.poses.push_back(p_msg.pose.pose);
     }
     
@@ -309,7 +309,7 @@ void PFVisualization::getEstimatedRobotPose()
     est_msg.header.stamp = ros::Time::now();
     est_msg.header.frame_id = odom_msg_.header.frame_id;
     est_msg.child_frame_id = odom_msg_.child_frame_id;
-    est_msg.pose.pose = potbot_lib::utility::get_Pose(Particle_Est_RobotX,Particle_Est_RobotY,0,0,0,Particle_Est_RobotYaw);
+    est_msg.pose.pose = potbot_lib::utility::get_pose(Particle_Est_RobotX,Particle_Est_RobotY,0,0,0,Particle_Est_RobotYaw);
     pub_estimated_robot_.publish(est_msg);
 }
 
@@ -328,7 +328,7 @@ void PFVisualization::getResamplingRobotPose0()
 	n.getParam("norm_noise_mean_angular_velocity", norm_noise_mean_angular_velocity);
 	n.getParam("norm_noise_variance_angular_velocity", norm_noise_variance_angular_velocity);   
 
-    std::vector<potbot_lib::Controller::DiffDriveController> particles_tmp = particles_;
+    std::vector<potbot_lib::DiffDriveAgent> particles_tmp = particles_;
     int Max_Likelihood_idx = 0;
 
     double step_weight = Likelihood_[0];
@@ -393,7 +393,7 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
     int weight_num = 0;
     int step_num = 0;
 
-    std::vector<potbot_lib::Controller::DiffDriveController> particles_tmp = particles_;
+    std::vector<potbot_lib::DiffDriveAgent> particles_tmp = particles_;
     
      
     if ( Effective_Sample_Size < particles_.size() * 0.3)

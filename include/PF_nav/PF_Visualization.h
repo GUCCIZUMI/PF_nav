@@ -2,7 +2,7 @@
 #define PF_VISUALIZATION_H_
 
 #include <ros/ros.h>
-#include <potbot_lib/DiffDriveController.h>
+#include <potbot_lib/diff_drive_agent.h>
 #include <potbot_msgs/ObstacleArray.h>
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/Pose.h>
@@ -10,7 +10,7 @@
 #include <geometry_msgs/PoseArray.h>
 #include <random>
 #include <visualization_msgs/MarkerArray.h>
-#include <potbot_lib/Utility.h>
+#include <potbot_lib/utility_ros.h>
 #include <cmath>
 #include <vector>
 #include <math.h>
@@ -25,7 +25,7 @@ private:
     ros::Publisher pub_estimated_robot_, pub_particles_, pub_particles_state_;
 
     nav_msgs::Odometry odom_msg_;
-    std::vector<potbot_lib::Controller::DiffDriveController> particles_;
+    std::vector<potbot_lib::DiffDriveAgent> particles_;
 
     //各記録用(ofstream定義)
     // std::ofstream record_end_angle_; //観測用カメラの測定最終角度
