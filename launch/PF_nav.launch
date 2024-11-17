@@ -1,5 +1,5 @@
 <launch>
-   <arg name="particle_num"                                    default="1000"/>
+   <arg name="particle_num"                                    default="100"/>
 
    <group ns="PF_nav">
       <node pkg="controller_tutorial" name="controller_tutorial" type="controller_tutorial" output="screen">
@@ -15,9 +15,9 @@
          <param name="norm_noise_mean_yaw"                     value="0.0"/>
          <param name="norm_noise_variance_yaw"                 value="0.0001"/>
          <param name="norm_noise_mean_linear_velocity"         value="0.0"/>
-         <param name="norm_noise_variance_linear_velocity"     value="0.0001"/>
+         <param name="norm_noise_variance_linear_velocity"     value="0.0000297694"/>
          <param name="norm_noise_mean_angular_velocity"        value="0.0"/>
-         <param name="norm_noise_variance_angular_velocity"    value="0.0001"/>
+         <param name="norm_noise_variance_angular_velocity"    value="0.00111064"/>
          
          <!-- 移動制御のパラメータ -->
          <param name="gain_p"                                  value="1.0"/>
@@ -25,7 +25,7 @@
          <param name="gain_d"                                  value="0.001"/>
          <param name="stop_margin_angle"                       value="0.01"/>
          <param name="stop_margin_distance"                    value="0.03"/>
-         <param name="max_linear_velocity"                     value="0.5"/>
+         <param name="max_linear_velocity"                     value="0.25"/>
          <param name="max_angular_velocity"                    value="0.6"/>
       </node>
 
@@ -41,15 +41,17 @@
 
          <!-- パーティクル移動時のノイズパラメータ -->
          <param name="norm_noise_mean_linear_velocity"         value="0.0"/>
-         <param name="norm_noise_variance_linear_velocity"     value="0.1"/>
+         <param name="norm_noise_variance_linear_velocity"     value="0.0000297694"/>
          <param name="norm_noise_mean_angular_velocity"        value="0.0"/>
-         <param name="norm_noise_variance_angular_velocity"    value="0.1"/>
+         <param name="norm_noise_variance_angular_velocity"    value="0.00111064"/>
          
          <!-- ロボット観測値のノイズパラメータ -->
-         <param name="norm_noise_mean_Scan_distance"         value="0.0"/>
+         <param name="norm_noise_mean_Scan_distance"         value="0.327"/>
          <param name="norm_noise_variance_Scan_distance"     value="0.000856"/>
          <param name="norm_noise_mean_Scan_angle"        value="0.0"/>
          <param name="norm_noise_variance_Scan_angle"    value="0.00464"/>
+         <param name="norm_noise_mean_Scan_Long_distance"        value="1.37"/>
+         <param name="norm_noise_variance_Scan_Long_distance"    value="0.0138"/>
      </node>
 
       <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find PF_nav)/rviz/PF_nav.rviz"/>
