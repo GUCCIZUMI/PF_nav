@@ -201,9 +201,9 @@ void PFVisualization::getObservedLandmark(std::vector<int>& in_range)
 
         robot_scan_distances_.push_back(Scan_distance_);
         
-        ROS_INFO_STREAM("observed landmark: " << marker_ids_[i] <<
-                   " Robot_distance: " << Robot_distance_ <<
-                   " Scan_distance: " << Scan_distance_);
+        // ROS_INFO_STREAM("observed landmark: " << marker_ids_[i] <<
+        //            " Robot_distance: " << Robot_distance_ <<
+        //            " Scan_distance: " << Scan_distance_);
 
         if(Robot_distance_ > radius_){
             continue;
@@ -239,7 +239,7 @@ void PFVisualization::getObservedLandmark(std::vector<int>& in_range)
             in_range.push_back(marker_ids_[i]);
         }
     } 
-    ROS_INFO("observed landmarks num: %d", in_range.size());
+    //ROS_INFO("observed landmarks num: %d", in_range.size());
     robot_distances_.clear();
     robot_scan_distances_.clear();
     robot_angles_.clear();
@@ -266,34 +266,35 @@ void PFVisualization::getLikelihood(size_t marker_id)
         //     particle_angle += 2 * M_PI;
         // }
 
-        dis_var_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
+        //dis_var_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
         
         //変曲点に着目した距離分散変動
         observe_scan_distance_error_ = abs(abs(Scan_distance_)-abs(particle_distance));
-        ROS_INFO_STREAM("observe_scan_distance_error_: " << observe_scan_distance_error_ <<
-                   " Scan_distance_: " << Scan_distance_ <<
-                   " particle_distance: " << particle_distance);
+        // ROS_INFO_STREAM("observe_scan_distance_error_: " << observe_scan_distance_error_ <<
+        //            " Scan_distance_: " << Scan_distance_ <<
+        //            " particle_distance: " << particle_distance);
 
-        if (abs(abs(Scan_distance_)-abs(particle_distance))>0.5&&abs(abs(Scan_distance_)-abs(particle_distance))<1.0)
-        {
-            dis_var_=abs(abs(Scan_distance_)-abs(particle_distance))*abs(abs(Scan_distance_)-abs(particle_distance));
-        }
+        // if (abs(abs(Scan_distance_)-abs(particle_distance))>0.8&&abs(abs(Scan_distance_)-abs(particle_distance))<1.3)
+        // {
+        //     dis_var_=abs(abs(Scan_distance_)-abs(particle_distance))*abs(abs(Scan_distance_)-abs(particle_distance));
+        //     Scan_distance_ = Scan_distance_ - 0.80;
+        // }
 
         double w_dis = 1/(sqrt(2 * M_PI * dis_var_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*dis_var_))+1e-100; 
 
         double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - particle.yaw)) * ( Scan_angle_ - (- particle_angle - particle.yaw))) / (2 * ang_var_))+1e-100;
 
-        if (abs(abs(Scan_distance_)-abs(particle_distance))>1.0)
-        {
-            w_dis=1;
-        }
+        // if (abs(abs(Scan_distance_)-abs(particle_distance))>1.3)
+        // {
+        //     w_dis=1;
+        // }
         
         if(Scan_angle_ * particle_angle > 0 && particle_angle > 1.57)
         {
-            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI)))) / (2 * M_PI * ang_var_))+1e-100;
+            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI)))) / (2  * ang_var_))+1e-100;
         }else if (Robot_angle_ * particle_angle > 0 && particle_angle < -1.57)
         {
-            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI)))) / (2 * M_PI * ang_var_))+1e-100;
+            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI)))) / (2  * ang_var_))+1e-100;
         }
         
 
@@ -302,7 +303,11 @@ void PFVisualization::getLikelihood(size_t marker_id)
 
         double weight = exp(w_dis_log + w_ang_log);
         
+        ROS_INFO_STREAM("weight: " <<  weight);
+
         Likelihood_[j]*=weight;
+        
+        ROS_INFO_STREAM("Likelihood: " <<  Likelihood_[j]);
 
         //std::cout << "distance_weight" <<  w_dis << "angle_weight" << w_ang << "total_wight" << total_weight_ << :: std::endl;
 
@@ -319,8 +324,8 @@ void PFVisualization::getLikelihood(size_t marker_id)
         // }
     }
 
-    ROS_INFO_STREAM("Likelihood_ size: " << Likelihood_.size());
-    ROS_INFO_STREAM("particle size: " <<  particles_.size());
+    // ROS_INFO_STREAM("Likelihood_ size: " << Likelihood_.size());
+    // ROS_INFO_STREAM("particle size: " <<  particles_.size());
 }   
 //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -332,7 +337,7 @@ void PFVisualization::getEstimatedRobotPose()
     double Particle_Est_RobotY = 0.0;
     double Particle_Est_RobotYaw = 0.0;
 
-    ROS_INFO("Starting Localization_mode");
+    // ROS_INFO("Starting Localization_mode");
     
     for (size_t j = 0; j < particles_.size(); ++j)
     {
@@ -357,10 +362,10 @@ void PFVisualization::getEstimatedRobotPose()
     // std::cout << "Particle_Est_RobotX=" <<Particle_Est_RobotX<< std::endl;
     // std::cout << "Particle_Est_RobotY=" <<Particle_Est_RobotY<< std::endl;
     // std::cout << "Particle_Est_RobotTH=" <<Particle_Est_RobotYaw<< std::endl;
-    ROS_INFO_STREAM("Norm total weight: " << Norm_total_weight <<
-                    " EstX: " << Particle_Est_RobotX <<
-                    " EstY: " << Particle_Est_RobotY <<
-                    " EstTh: " << Particle_Est_RobotYaw);
+    // ROS_INFO_STREAM("Norm total weight: " << Norm_total_weight <<
+    //                 " EstX: " << Particle_Est_RobotX <<
+    //                 " EstY: " << Particle_Est_RobotY <<
+    //                 " EstTh: " << Particle_Est_RobotYaw);
 
     nav_msgs::Odometry est_msg;
     est_msg.header.stamp = ros::Time::now();
@@ -440,7 +445,7 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
     Effective_Sample_Size = 1 / ESS_sum;
 
     Ess_txt << "Effective_Sample_Size_" <<  "  "  << Effective_Sample_Size << std::endl;
-    ROS_INFO("Effective_Sample_Size_: %f", Effective_Sample_Size);
+    // ROS_INFO("Effective_Sample_Size_: %f", Effective_Sample_Size);
 
     std::random_device rd;
     std::default_random_engine eng(rd());
@@ -456,7 +461,7 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
      
     if ( Effective_Sample_Size < particles_.size() * 0.5)
     {
-        ROS_INFO("Not Active Resampling");
+        // ROS_INFO("Not Active Resampling");
     }else
     {
         while(step_num <  particles_.size())
