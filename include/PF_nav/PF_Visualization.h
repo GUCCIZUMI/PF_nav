@@ -80,7 +80,7 @@ public:
     void updateParticles();
     
     void initLiklihood();
-    void normLiklihood(); 1
+    void normLiklihood(); 
     void getObservedLandmark(std::vector<int>& in_range);
     void getLikelihood(size_t marker_id);
     void getLikelihood_main(size_t marker_id);
