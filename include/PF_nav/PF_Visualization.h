@@ -21,10 +21,10 @@
 class PFVisualization
 {
 private:
-    ros::Subscriber sub_marker_, sub_robot_pose_, sub_particle_pose_;
+    ros::Subscriber sub_marker_, sub_robot_pose_, sub_particle_pose_, sub_robot_command_;
     ros::Publisher pub_estimated_robot_, pub_particles_, pub_particles_state_,  pub_odom_encoder_;
 
-    nav_msgs::Odometry odom_msg_;
+    nav_msgs::Odometry odom_msg_, odom_turu_msg_;
     std::vector<potbot_lib::DiffDriveAgent> particles_;
 
     //各記録用(ofstream定義)
@@ -48,8 +48,10 @@ private:
     //std::vector<double> particle_position_x; //各パーティクルのx座標
     //std::vector<double> particle_position_y; //各パーティクルのx座標
     //std::vector<double> particle_position_yaw; //各パーティクルのx座標
-
+    
+    int Count_step_ = 0;
     double robot_pose_x_ = 0.0, robot_pose_y_ = 0.0, robot_pose_z_ = 0.0, robot_pose_yaw_ = 0.0; //ロボット位置の真値(定義)
+    double robot_velocity_ = 0.0, robot_angular_velocity_ = 0.0; //ロボットの指令値(真値)
     double Robot_distance_ = 0.0, Robot_angle_ = 0.0; //ロボットとマーカーの距離と角度(角度に関してはロボット座標系における角度に変更する必要あるかも)
     double Scan_distance_ = 0.0, Scan_angle_ = 0.0; //ロボットから取得できるセンサ観測値
     double particle_position_x_ = 0.0, particle_position_y_ = 0.0, Particle_Est_RobotYaw_ = 0.0; //パーティクルの位置(使ってない)
@@ -62,21 +64,29 @@ private:
     bool sebscribed_robot_pose_ = false;
     bool sebscribed_landmark_pose_ = false;
     bool sebscribed_particle_pose_ = false;
+    bool subscribed_robot_command = false;
+    bool initial_Time = true;
+
 public:
     PFVisualization(/* args */);
     ~PFVisualization(){};
-
+    
+    void filteringdecision();
+    void initialparticlepose();
+    
     void markerCallback(const visualization_msgs::MarkerArray& marker_array);
     void robotPoseCallback(const nav_msgs::Odometry& odom_pose);
+    void robotCommandCallback(const nav_msgs::Odometry& odom_true_pose);
     void updateParticles();
-
+    
     void initLiklihood();
     void normLiklihood();
     void getObservedLandmark(std::vector<int>& in_range);
     void getLikelihood(size_t marker_id);
+    void getLikelihood_main(size_t marker_id);
     void getEstimatedRobotPose();
     void localization();
-     void getResamplingRobotPose0();
+    void getResamplingRobotPose0();
     void getResamplingRobotPose1(std::vector<double>& step_sum_weight_);
     void getResamplingRobotPose2(std::vector<double>& step_sum_weight_);
 };
