@@ -118,7 +118,7 @@ void PFVisualization::localization()
     
         for (const auto& marker_id:in_range_ids)
         {
-            getLikelihood_main(marker_id);
+            getLikelihood(marker_id);
         }
     
         normLiklihood();
@@ -328,23 +328,23 @@ void PFVisualization::getLikelihood(size_t marker_id)
 
         // dis_var_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
 
-        double w_dis = 1/(sqrt(2 * M_PI * dis_var_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*dis_var_))+1e-100; 
+        // double w_dis = 1/(sqrt(2 * M_PI * dis_var_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*dis_var_))+1e-100; 
 
-        //double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - particle.yaw)) * ( Scan_angle_ - (- particle_angle - particle.yaw))) / (2 * ang_var_))+1e-100;
+        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - particle.yaw)) * ( Scan_angle_ - (- particle_angle - particle.yaw))) / (2 * ang_var_))+1e-100;
         
-        // if(Scan_angle_ * particle_angle > 0 && particle_angle > 1.57)
-        // {
-        //     w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI)))) / (2  * ang_var_))+1e-100;
-        // }else if (Robot_angle_ * particle_angle > 0 && particle_angle < -1.57)
-        // {
-        //     w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI)))) / (2  * ang_var_))+1e-100;
-        // }
+        if(Scan_angle_ * particle_angle > 0 && particle_angle > 1.57)
+        {
+            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI)))) / (2  * ang_var_))+1e-100;
+        }else if (Robot_angle_ * particle_angle > 0 && particle_angle < -1.57)
+        {
+            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI)))) / (2  * ang_var_))+1e-100;
+        }
         
 
-        double w_dis_log = log10(w_dis);
-        // double w_ang_log = log10(w_ang);
+        // double w_dis_log = log10(w_dis);
+        double w_ang_log = log10(w_ang);
 
-        double weight = exp(w_dis_log);
+        double weight = exp(w_ang_log);
 
         Likelihood_[j]*=weight;
     }
@@ -386,28 +386,28 @@ void PFVisualization::getLikelihood_main(size_t marker_id)
             Scan_distance_ = Scan_distance_ - 0.80;
         }
 
-        double w_dis = 1/(sqrt(2 * M_PI * dis_var_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*dis_var_))+1e-100; 
+        // double w_dis = 1/(sqrt(2 * M_PI * dis_var_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*dis_var_))+1e-100; 
 
-        //double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - particle.yaw)) * ( Scan_angle_ - (- particle_angle - particle.yaw))) / (2 * ang_var_))+1e-100;
+        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - particle.yaw)) * ( Scan_angle_ - (- particle_angle - particle.yaw))) / (2 * ang_var_))+1e-100;
 
-        if (abs(abs(Scan_distance_)-abs(particle_distance))>1.3)
-        {
-            w_dis=1;
-        }
-        
-        // if(Scan_angle_ * particle_angle > 0 && particle_angle > 1.57)
+        // if (abs(abs(Scan_distance_)-abs(particle_distance))>1.3)
         // {
-        //     w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI)))) / (2  * ang_var_))+1e-100;
-        // }else if (Robot_angle_ * particle_angle > 0 && particle_angle < -1.57)
-        // {
-        //     w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI)))) / (2  * ang_var_))+1e-100;
+        //     w_dis=1;
         // }
         
+        if(Scan_angle_ * particle_angle > 0 && particle_angle > 1.57)
+        {
+            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI)))) / (2  * ang_var_))+1e-100;
+        }else if (Robot_angle_ * particle_angle > 0 && particle_angle < -1.57)
+        {
+            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI)))) / (2  * ang_var_))+1e-100;
+        }
+        
 
-        double w_dis_log = log10(w_dis);
-        // double w_ang_log = log10(w_ang);
+        // double w_dis_log = log10(w_dis);
+        double w_ang_log = log10(w_ang);
 
-        double weight = exp(w_dis_log);
+        double weight = exp(w_ang_log);
 
         Likelihood_[j]*=weight;
                 
