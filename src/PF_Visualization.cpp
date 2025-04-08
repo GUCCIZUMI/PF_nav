@@ -118,7 +118,7 @@ void PFVisualization::localization()
     
         for (const auto& marker_id:in_range_ids)
         {
-            getLikelihood_main(marker_id);
+            getLikelihood(marker_id);
         }
     
         normLiklihood();
