@@ -98,9 +98,9 @@ void PFVisualization::robotPoseCallback(const nav_msgs::Odometry& odom_pose)
 
 void PFVisualization::localization()
 {
-    if (initial_Time) {
-        initialparticlepose();
-    }
+    // if (initial_Time) {
+    //     initialparticlepose();
+    // }
 
     filteringdecision();
     
@@ -118,7 +118,7 @@ void PFVisualization::localization()
     
         for (const auto& marker_id:in_range_ids)
         {
-            getLikelihood_main(marker_id);
+            getLikelihood(marker_id);
         }
     
         normLiklihood();
