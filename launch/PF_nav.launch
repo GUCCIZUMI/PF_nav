@@ -45,7 +45,7 @@
          <param name="norm_noise_mean_angular_velocity"        value="0.0"/>
          <param name="norm_noise_variance_angular_velocity"    value="0.00111064"/>
 
-         <!-- パーティクルの初期配置におけるノイズパラメータ -->>
+         <!-- パーティクルの初期配置におけるノイズパラメータ -->
          <param name="initial_particle_Position_mean_noise"             value="0.0"/>
          <param name="initial_particle_Position_variance_noise"             value="0.1"/>
          <param name="initial_particle_yaw_mean_noise"             value="0.0"/>

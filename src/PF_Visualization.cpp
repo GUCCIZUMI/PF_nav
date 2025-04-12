@@ -118,7 +118,7 @@ void PFVisualization::localization()
     
         for (const auto& marker_id:in_range_ids)
         {
-            getLikelihood(marker_id);
+            getLikelihood_main(marker_id);
         }
     
         normLiklihood();
@@ -322,11 +322,11 @@ void PFVisualization::getLikelihood(size_t marker_id)
         
         double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_); //マーカとパーティクルの直線距離
         double particle_angle = particle.yaw - atan2(dis_Y_ , dis_X_); //マーカとパーティクルの角度
-        // if(particle_angle < 0){
-        //     particle_angle += 2 * M_PI;
-        // }
+        if(particle_angle < 0){
+            particle_angle += 2 * M_PI;
+        }
 
-        // dis_var_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
+        dis_var_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
 
         double w_dis = 1/(sqrt(2 * M_PI * dis_var_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*dis_var_))+1e-100; 
 
