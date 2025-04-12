@@ -1,0 +1,17 @@
+<launch>
+     <arg name="particle_num"                                    default="1000"/>
+     <group ns="PF_nav">
+        <node pkg="PF_nav" name="PF_nav_Visualization" type="PF_nav_Visualization" output="screen">
+         <!-- <param name="particle_num"                            value="$(arg particle_num)"/> -->
+
+         <!-- 生成するパーティクル数 -->
+         <param name="particle_num"                            value="$(arg particle_num)"/>
+
+         <!-- パーティクル移動時のノイズパラメータ -->
+         <param name="norm_noise_mean_linear_velocity"         value="0.0"/>
+         <param name="norm_noise_variance_linear_velocity"     value="0.1"/>
+         <param name="norm_noise_mean_angular_velocity"        value="0.0"/>
+         <param name="norm_noise_variance_angular_velocity"    value="0.1"/>
+        </node>
+    </group>    
+</launch>

@@ -1,6 +1,6 @@
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <potbot_lib/Utility.h>
+#include <potbot_lib/utility_ros.h>
 
 #include <string>
 #include <math.h>
@@ -27,7 +27,7 @@ int main(int argc, char** argv)
     n.getParam(param_name + "/x", x);
     n.getParam(param_name + "/y", y);
     n.getParam(param_name + "/yaw", yaw_deg);
-    marker_pose.push_back(potbot_lib::utility::get_Pose(x,y,0,0,0,yaw_deg/180.0*M_PI));
+    marker_pose.push_back(potbot_lib::utility::get_pose(x,y,0,0,0,yaw_deg/180.0*M_PI));
     id++;
   }
 

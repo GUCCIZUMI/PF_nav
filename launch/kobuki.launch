@@ -1,0 +1,14 @@
+<!-- <launch>
+
+   <node pkg="PF_nav" name="kobuki_controller" type="pub_cmd" output="screen">
+      
+      <param name="liner_X" value="0.25"/>
+      <param name="max_liner_X" value="0.25"/>
+      <param name="foward_gain_p" value="0.25"/>
+      <param name="rotation_gain_p" value="1.00"/>
+      <param name="target_X" value="11.00"/>
+      <param name="target_Y" value="3.00"/> 
+      <param name="target_yaw" value="-1.57"/>
+      <param name="rowtationgain_p" value="1.0"/>
+   </node>
+</launch> -->

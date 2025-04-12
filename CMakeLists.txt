@@ -16,6 +16,7 @@ catkin_package(
 )
 
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -30,5 +31,8 @@ target_link_libraries(${PROJECT_NAME}_MarkerArray ${catkin_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_Visualization src/PF_Visualization.cpp)
 target_link_libraries(${PROJECT_NAME}_Visualization ${catkin_LIBRARIES})
+
+add_executable(pub_cmd src/pub_cmd.cpp)
+target_link_libraries(pub_cmd ${catkin_LIBRARIES})
 
 add_definitions(-std=c++14)
