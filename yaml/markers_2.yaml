@@ -1,0 +1,14 @@
+marker0:
+  x: 2.5    # マーカー位置 x [m]
+  y: -1.0    # マーカー位置 y [m]
+  yaw: 0.0 # マーカー姿勢 yaw [deg]
+
+marker1:
+  x: 2.5
+  y: 1.0
+  yaw: 0.0
+
+marker2:
+  x: 6.0
+  y: 0.0
+  yaw: 0.0
