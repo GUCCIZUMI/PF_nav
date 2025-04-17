@@ -35,4 +35,7 @@ target_link_libraries(${PROJECT_NAME}_Visualization ${catkin_LIBRARIES})
 add_executable(pub_cmd src/pub_cmd.cpp)
 target_link_libraries(pub_cmd ${catkin_LIBRARIES})
 
+add_executable(${PROJECT_NAME}_keyboard src/PF_keyboard.cpp)
+target_link_libraries(${PROJECT_NAME}_keyboard ${catkin_LIBRARIES})
+
 add_definitions(-std=c++14)

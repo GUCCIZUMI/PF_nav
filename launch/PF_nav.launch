@@ -62,5 +62,7 @@
 
       <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find PF_nav)/rviz/PF_nav.rviz"/>
 
+      <node pkg="PF_nav" name="PF_nav_keyboard" type="PF_nav_keyboard" output="screen"/>
+
    </group>
 </launch>
