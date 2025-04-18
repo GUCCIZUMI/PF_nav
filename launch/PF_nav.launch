@@ -2,7 +2,7 @@
    <arg name="particle_num"                                    default="100"/>
 
    <group ns="PF_nav">
-      <node pkg="controller_tutorial" name="controller_tutorial" type="controller_tutorial" output="screen">
+      <node pkg="PF_nav" name="PF_nav" type="PF_nav" output="screen">
 
          <!-- 制御周期 Hz -->
          <param name="control_frequency"                       value="50.0"/>
@@ -30,7 +30,7 @@
       </node>
 
       <node pkg="PF_nav" name="PF_nav_MarkerArray" type="PF_nav_MarkerArray" output="screen">
-         <rosparam command="load" file="$(find PF_nav)/yaml/markers_2.yaml"/>
+         <rosparam command="load" file="$(find PF_nav)/yaml/markers.yaml"/>
       </node>
      
      <node pkg="PF_nav" name="PF_nav_Visualization" type="PF_nav_Visualization" output="screen">

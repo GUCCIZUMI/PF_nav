@@ -26,6 +26,8 @@ int main(int argc, char **argv){
     ros::init(argc, argv, "PF_keyboard");
     ros::NodeHandle nh;
 
+    ros::Publisher  keyboard_pub_twist;
+    
     ros::Subscriber sub_keyboard = nh.subscribe("/cmd_vel", 1, keyboard_callback);
 
     ros::spin();  // コールバックを処理
