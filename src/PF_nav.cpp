@@ -76,19 +76,6 @@ void param_callback(const PF_nav::PF_navConfig& param, uint32_t level)
 	g_robot[0].setLimit(	param.max_linear_velocity,
 							param.max_angular_velocity);
 }
-
-
-// //<--追加要素(マーカーの配置、座標について)>-----------------------------------------------------------------------------------------------------------------------
-// 	void Marker_callback(const visualization_msgs::MarkerArray& Marker_msg){
-// 		std::vector<geometry_msgs::Point> points = Marker_msg->points;
-
-// 	}
-
-// //---------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
 //-----------------------------------------------------------------------------------------------------------------------------------------
 
 //(ここから実際に使用するプログラム----------------------------------------------------------------------------------------------------------
@@ -125,11 +112,10 @@ int main(int argc,char **argv){
 	ros::Publisher pub_odom					= nh.advertise<nav_msgs::Odometry>("odom", 1); //140行で設定している変数の送信定義(robot_pose)
 	ros::Publisher pub_particles			= nh.advertise<geometry_msgs::PoseArray>("particles", 1); //141行で設定している変数の送信定義(particles_msg)
 	ros::Publisher pub_particles_state		= nh.advertise<potbot_msgs::ObstacleArray>("particles_state", 1); //142行で設定している変数の送信定義(particle_state_msg)
+	ros::Publisher pub_odom_truth           = nh.advertise<nav_msgs::Odometry>("odom/truth", 1); 
 
 	ros::Subscriber sub_inipose				= nh.subscribe("initialpose",1,inipose_callback); //inipose::初期配置の受信定義(どこから送信しているかはわからない)
 	ros::Subscriber sub_goal				= nh.subscribe("move_base_simple/goal",1,goal_callback); //goal::目標地点の受信定義(どこから送信しているかはわからない)
-
-	//ros::Subscriber Marker_Sub              = nh.subscribe("marker_array",1,Marker_callback);
 
     //ここについても何をしているかわからないので小池さんに聞くこと----------------------------------------------------------------------------------------------------------------
 	dynamic_reconfigure::Server<PF_nav::PF_navConfig> server;
@@ -154,7 +140,7 @@ int main(int argc,char **argv){
 		robo.deltatime = 1.0/control_frequency;;
 		potbot_lib::utility::to_agent(robot_pose, robo);
 	}
-
+    
 	init_particles();
 
 	for (size_t i = 0; i < particle_num; i++) 
@@ -180,6 +166,8 @@ int main(int argc,char **argv){
 		g_robot[0].update();
 		
 		potbot_lib::utility::to_msg(g_robot[0], robot_pose);
+
+		pub_odom_truth.publish(robot_pose);
 
 		particles_msg.header = robot_pose.header;
 		particle_state_msg.header = robot_pose.header;
