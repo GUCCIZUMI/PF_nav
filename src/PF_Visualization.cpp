@@ -5,10 +5,15 @@ std::ofstream Ess_txt("/home/ros/catkin_ws/user/src/data/simulator/Ess.txt");
 std::ofstream Estimate_position("/home/ros/catkin_ws/user/src/data/simulator/Estimate_position.csv");
 std::ofstream Robot_command("/home/ros/catkin_ws/user/src/data/simulator/Robot_command.csv");
 std::ofstream Pt_Position("/home/ros/catkin_ws/user/src/data/simulator/Pt_position.csv");
+std::ofstream Robot_angle("/home/ros/catkin_ws/user/src/data/simulator/Robot_angle.csv");
+std::ofstream Particle_angle("/home/ros/catkin_ws/user/src/data/simulator/Particle_angle.csv");
+
+int Pt_idx = 0;
+int Robot_idx = 0;
 
 PFVisualization::PFVisualization(/* args */)
 {
-    
+
     ros::NodeHandle n("~");
 
     int particle_num = 100;
@@ -25,12 +30,6 @@ PFVisualization::PFVisualization(/* args */)
     
     ros::NodeHandle nh;
 	pub_particles_ = nh.advertise<geometry_msgs::PoseArray>("particles", 1);
-	// pub_particles_state_ = nh.advertise<potbot_msgs::ObstacleArray>("particles_state", 1);
-
-	// ros::Subscriber sub_inipose				= nh.subscribe("initialpose",1,inipose_callback);
-
-    // pub_odom_encoder_ = nh.advertise<geometry_msgs::PoseArray>("odom/encoder", 1); //2024年11月14日追加
-
     pub_estimated_robot_ = nh.advertise<nav_msgs::Odometry>("odom/estimated", 1);
 
     // サブスクライバの作成
@@ -163,13 +162,15 @@ void PFVisualization::initialparticlepose()
     std::normal_distribution<double> initial_particle_Position_noise(initial_particle_Position_mean_noise, sqrt(initial_particle_Position_variance_noise));
 	std::normal_distribution<double> initial_particle_yaw_noise(initial_particle_yaw_mean_noise, sqrt(initial_particle_yaw_variance_noise));
 
-    for (size_t i = 1; i < particles_.size(); ++i)
+    for (auto& p : particles_)
 	{
-        particles_[i].x = particles_[i].x + initial_particle_Position_noise(generator);
-        particles_[i].y = particles_[i].y + initial_particle_Position_noise(generator);
-        particles_[i].yaw = particles_[i].yaw + initial_particle_yaw_noise(generator);
+        p.x = p.x + initial_particle_Position_noise(generator);
+        p.y = p.y + initial_particle_Position_noise(generator);
+        p.yaw =  p.yaw  + initial_particle_yaw_noise(generator);
+        std::cout << p.x << p.y << p.yaw << std::endl;
 	}
-
+    
+    std::cout << "パーティクル拡散" << std::endl;
     initial_Time = false;    
 }
 
@@ -195,15 +196,6 @@ void PFVisualization::updateParticles()
 
     pub_particles_.publish(particles_msg);
 
-    // //2024年11月14日追加事項(エンコーダーによる観測)---------------------------------
-    // nav_msgs::Odometry encoder_msg;
-
-    // encoder_msg.v = odom_msg_.twist.twist.linear.x;
-    // encoder_msg.omega = odom_msg_.twist.twist.angular.z;
-    // encoder_msg.deltatime = 1.0/50.0;
-    // encoder_msg.update();
-
-    // pub_odom_encoder_.publish(encoder_msg);
 }
 
 void PFVisualization::initLiklihood()
@@ -246,6 +238,8 @@ void PFVisualization::getObservedLandmark(std::vector<int>& in_range)
 
     in_range.clear();
 
+    double Robot_atan = 0.0;
+
     for(size_t i = 0; i < marker_positions_.size(); ++i)
     {
         const auto& marker_pose = marker_positions_[i];
@@ -267,8 +261,12 @@ void PFVisualization::getObservedLandmark(std::vector<int>& in_range)
         if(Robot_distance_ > radius_){
             continue;
         }
-    
-        Robot_angle_ = robot_pose_yaw_ - std::atan2(dy, dx); //マーカーとロボットの角度(真値の角度：センサ値)
+        
+        Robot_atan = std::atan2(dy, dx);
+        Robot_idx += 1;
+        Robot_angle_ = std::atan2(dy, dx) - robot_pose_yaw_; //マーカーとロボットの角度(真値の角度：センサ値)
+        Robot_angle <<  " マーカ番号 "  << marker_ids_[i] <<  " atan角度 "  << Robot_atan <<  " ロボット姿勢 "  << robot_pose_yaw_ << " 計算後の尤度角度 " << Robot_angle_ << " 処理番号 " << Robot_idx << std :: endl;
+        
         robot_angles_.push_back(Robot_angle_);
 
         Scan_angle_ = Robot_angle_ + distribution_Scan_angle(generator); //マーカーとロボットの角度(真値の角度：ノイズ入りセンサ値)
@@ -311,7 +309,8 @@ void PFVisualization::getLikelihood(size_t marker_id)
     const auto& marker = marker_positions_[marker_id];
     double Scan_distance_ = robot_scan_distances_[marker_id];
     double Scan_angle_ = robot_scan_angles_[marker_id];
-    
+    double Pt_atan = 0.0;
+    Pt_idx += 1;
 
     for (size_t j = 0; j < particles_.size(); ++j)
     {
@@ -320,27 +319,36 @@ void PFVisualization::getLikelihood(size_t marker_id)
         dis_X_ = marker.position.x - particle.x; //マーカとパーティクルのx座標距離(予測値の距離：推定値)
         dis_Y_ = marker.position.y - particle.y; //マーカとパーティクルのy座標距離(予測値の距離：推定値)
         
+        Pt_atan = atan2(dis_Y_ , dis_X_);
         double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_); //マーカとパーティクルの直線距離
-        double particle_angle = particle.yaw - atan2(dis_Y_ , dis_X_); //マーカとパーティクルの角度
-        if(particle_angle < 0){
-            particle_angle += 2 * M_PI;
-        }
+        double particle_angle = atan2(dis_Y_ , dis_X_) - particle.yaw ; //マーカとパーティクルの角度
+
+        
+        Particle_angle <<  " マーカ番号 "  << marker_ids_[marker_id] <<  " atan角度 "  << Pt_atan << " パーティクルID " << j <<  " パーティクル姿勢 "  << particle.yaw << " 計算後の尤度角度 "  << particle_angle << " 処理番号 " << Pt_idx << std :: endl;
 
         dis_var_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
 
+        std::cout << "スキャン距離" << Scan_distance_ << "パーティクル距離" << particle_distance << std::endl;
+
         double w_dis = 1/(sqrt(2 * M_PI * dis_var_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*dis_var_))+1e-100; 
 
-        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - particle.yaw)) * ( Scan_angle_ - (- particle_angle - particle.yaw))) / (2 * ang_var_))+1e-100;
-        
-        if(Scan_angle_ * particle_angle > 0 && particle_angle > 1.57)
+        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ -  particle_angle ) * ( Scan_angle_ - particle_angle )) / (2 * ang_var_))+1e-100;
+
+        if (Scan_distance_ == 0)
         {
-            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI)))) / (2  * ang_var_))+1e-100;
-        }else if (Robot_angle_ * particle_angle > 0 && particle_angle < -1.57)
-        {
-            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI)))) / (2  * ang_var_))+1e-100;
+            w_dis = 1;
         }
         
+        if (Scan_angle_ == 0)
+        {
+            w_ang = 1;
+        }
 
+        if (abs(abs(Scan_distance_)-abs(particle_distance))>1.3)
+        {
+            w_dis=1;
+        }
+        
         double w_dis_log = log10(w_dis);
         double w_ang_log = log10(w_ang);
 
@@ -356,7 +364,8 @@ void PFVisualization::getLikelihood_main(size_t marker_id)
     const auto& marker = marker_positions_[marker_id];
     double Scan_distance_ = robot_scan_distances_[marker_id];
     double Scan_angle_ = robot_scan_angles_[marker_id];
-    
+    double Pt_atan = 0.0;
+    Pt_idx += 1;
 
     for (size_t j = 0; j < particles_.size(); ++j)
     {
@@ -364,46 +373,46 @@ void PFVisualization::getLikelihood_main(size_t marker_id)
 
         dis_X_ = marker.position.x - particle.x; //マーカとパーティクルのx座標距離(予測値の距離：推定値)
         dis_Y_ = marker.position.y - particle.y; //マーカとパーティクルのy座標距離(予測値の距離：推定値)
+
+        Pt_atan = atan2(dis_Y_ , dis_X_);
         
         double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_);
-        double particle_angle = particle.yaw - atan2(dis_Y_ , dis_X_);
+        double particle_angle = atan2(dis_Y_ , dis_X_) - particle.yaw;
         
-        if(particle_angle < 0){
-            particle_angle += 2 * M_PI;
-        }
+        Particle_angle <<  " マーカ番号 "  << marker_ids_[marker_id] <<  " atan角度 "  << Pt_atan << " パーティクルID " << j <<  " パーティクル姿勢 "  << particle.yaw << " 計算後の尤度角度 "  << particle_angle << " 処理番号 " << Pt_idx << std :: endl;
 
         dis_var_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
         
         //変曲点に着目した距離分散変動
         observe_scan_distance_error_ = abs(abs(Scan_distance_)-abs(particle_distance));
-        ROS_INFO_STREAM("observe_scan_distance_error_: " << observe_scan_distance_error_ <<
-                   " Scan_distance_: " << Scan_distance_ <<
-                   " particle_distance: " << particle_distance);
 
         if (abs(abs(Scan_distance_)-abs(particle_distance))>0.8&&abs(abs(Scan_distance_)-abs(particle_distance))<1.3)
         {
             dis_var_=abs(abs(Scan_distance_)-abs(particle_distance))*abs(abs(Scan_distance_)-abs(particle_distance));
-            Scan_distance_ = Scan_distance_ - 0.80;
+            // Scan_distance_ = Scan_distance_ - 0.80; (2025-04-30なんでこの工程を入れたので残しておきます)
         }
+
+        std::cout << "スキャン距離" << Scan_distance_ << "パーティクル距離" << particle_distance << std::endl;
 
         double w_dis = 1/(sqrt(2 * M_PI * dis_var_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*dis_var_))+1e-100; 
 
-        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - particle.yaw)) * ( Scan_angle_ - (- particle_angle - particle.yaw))) / (2 * ang_var_))+1e-100;
+        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - particle_angle ) * ( Scan_angle_ - particle_angle )) / (2 * ang_var_))+1e-100;
+
+        if (Scan_distance_ == 0)
+        {
+            w_dis = 1;
+        }
+        
+        if (Scan_angle_ == 0)
+        {
+            w_ang = 1;
+        }
 
         if (abs(abs(Scan_distance_)-abs(particle_distance))>1.3)
         {
             w_dis=1;
         }
         
-        if(Scan_angle_ * particle_angle > 0 && particle_angle > 1.57)
-        {
-            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw - 2 * M_PI)))) / (2  * ang_var_))+1e-100;
-        }else if (Robot_angle_ * particle_angle > 0 && particle_angle < -1.57)
-        {
-            w_ang = 1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI))) * ( Scan_angle_ - (- particle_angle - (particle.yaw + 2 * M_PI)))) / (2  * ang_var_))+1e-100;
-        }
-        
-
         double w_dis_log = log10(w_dis);
         double w_ang_log = log10(w_ang);
 
@@ -540,7 +549,7 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
     std::vector<potbot_lib::DiffDriveAgent> particles_tmp = particles_;
     
      
-    if ( Effective_Sample_Size < particles_.size() * 0.5)
+    if ( Effective_Sample_Size > particles_.size() * 0.5)
     {
          ROS_INFO("Not Active Resampling");
     }else
@@ -563,22 +572,23 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
                 weight_num += 1;   
             }
         }
-        // double second_noise_mean_linear_velocity = 0;
-	    // double second_noise_variance_linear_velocity = 0.0001;
-	    // double second_noise_mean_angular_velocity = 0;
-	    // double second_noise_variance_angular_velocity = 0.0001;
 
-        // std::random_device rd3;
-        // std::default_random_engine generator(rd3());
-        // std::normal_distribution<double> distribution_linear_velocity_2(second_noise_mean_linear_velocity, sqrt(second_noise_variance_linear_velocity));
-	    // std::normal_distribution<double> distribution_angular_velocity_2(second_noise_mean_angular_velocity, sqrt(second_noise_variance_angular_velocity));
+        double second_noise_mean_linear_velocity = 0;
+	    double second_noise_variance_linear_velocity = 0.01;
+	    double second_noise_mean_angular_velocity = 0;
+	    double second_noise_variance_angular_velocity = 0.01;
 
-        // for (size_t j = 1; j < particles_.size(); ++j)
-	    // {
-        //     particles_[j].x = particles_[j].x + distribution_linear_velocity_2(generator);
-        //     particles_[j].y = particles_[j].x + distribution_linear_velocity_2(generator);
-        //     particles_[j].yaw = particles_[j].x + distribution_angular_velocity_2(generator);
-	    // }
+        std::random_device rd3;
+        std::default_random_engine generator(rd3());
+        std::normal_distribution<double> distribution_linear_velocity_2(second_noise_mean_linear_velocity, sqrt(second_noise_variance_linear_velocity));
+	    std::normal_distribution<double> distribution_angular_velocity_2(second_noise_mean_angular_velocity, sqrt(second_noise_variance_angular_velocity));
+
+        for (size_t j = 1; j < particles_.size(); ++j)
+	    {
+            particles_[j].x = particles_[j].x + distribution_linear_velocity_2(generator);
+            particles_[j].y = particles_[j].y + distribution_linear_velocity_2(generator);
+            particles_[j].yaw = particles_[j].yaw + distribution_angular_velocity_2(generator);
+	    }
     }
     std::fill(Likelihood_.begin(), Likelihood_.end(), 1.0 / particles_.size());
 }
