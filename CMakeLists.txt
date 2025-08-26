@@ -26,6 +26,9 @@ target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 add_executable(class_tutorial src/class_tutorial.cpp)
 target_link_libraries(class_tutorial ${catkin_LIBRARIES})
 
+add_executable(${PROJECT_NAME}_MarkerArray_2 src/PF_MarkerArray_2.cpp)
+target_link_libraries(${PROJECT_NAME}_MarkerArray_2 ${catkin_LIBRARIES})
+
 add_executable(${PROJECT_NAME}_MarkerArray src/PF_MarkerArray.cpp)
 target_link_libraries(${PROJECT_NAME}_MarkerArray ${catkin_LIBRARIES})
 
@@ -37,5 +40,8 @@ target_link_libraries(pub_cmd ${catkin_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_keyboard src/PF_keyboard.cpp)
 target_link_libraries(${PROJECT_NAME}_keyboard ${catkin_LIBRARIES})
+
+add_executable(${PROJECT_NAME}_SensorTest src/PF_SensorTest.cpp)
+target_link_libraries(${PROJECT_NAME}_SensorTest ${catkin_LIBRARIES})
 
 add_definitions(-std=c++14)

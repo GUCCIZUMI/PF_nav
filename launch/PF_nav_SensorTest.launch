@@ -42,37 +42,11 @@
       <node pkg="PF_nav" name="PF_nav_MarkerArray_2" type="PF_nav_MarkerArray_2" output="screen">
          <rosparam command="load" file="$(find PF_nav)/yaml/markers_3.yaml"/>
       </node>
-     
-     <node pkg="PF_nav" name="PF_nav_Visualization" type="PF_nav_Visualization" output="screen">
-         <!-- <param name="particle_num"                            value="$(arg particle_num)"/> -->
-
-         <!-- 生成するパーティクル数 -->
-         <param name="particle_num"                            value="$(arg particle_num)"/>
-
-         <!-- パーティクル移動時のノイズパラメータ -->
-         <param name="norm_noise_mean_linear_velocity"         value="0.0"/>
-         <param name="norm_noise_variance_linear_velocity"     value="0.0000297694"/>
-         <param name="norm_noise_mean_angular_velocity"        value="0.0"/>
-         <param name="norm_noise_variance_angular_velocity"    value="0.00111064"/>
-
-         <!-- パーティクルの初期配置におけるノイズパラメータ -->
-         <param name="initial_particle_Position_mean_noise"             value="0.0"/>
-         <param name="initial_particle_Position_variance_noise"             value="0.1"/>
-         <param name="initial_particle_yaw_mean_noise"             value="0.0"/>
-         <param name="initial_particle_yaw_variance_noise"             value="0.0352"/>
-
-         <!-- ロボット観測値のノイズパラメータ -->
-         <param name="norm_noise_mean_Scan_distance"         value="0.327"/>
-         <param name="norm_noise_variance_Scan_distance"     value="0.000856"/>
-         <param name="norm_noise_mean_Scan_angle"        value="0.0"/>
-         <param name="norm_noise_variance_Scan_angle"    value="0.00464"/>
-         <param name="norm_noise_mean_Scan_Long_distance"        value="1.37"/>
-         <param name="norm_noise_variance_Scan_Long_distance"    value="0.0138"/>
-     </node>
+      
+      <node pkg="PF_nav" name="PF_nav_SensorTest" type="PF_nav_SensorTest" output="screen"/>
 
       <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find PF_nav)/rviz/PF_nav.rviz"/>
 
-      <node pkg="PF_nav" name="PF_nav_keyboard" type="PF_nav_keyboard" output="screen"/>
 
    </group>
 </launch>

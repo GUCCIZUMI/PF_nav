@@ -124,7 +124,7 @@ void PFVisualization::localization()
 
         getEstimatedRobotPose();
 
-        getResamplingRobotPose1(step_sum_weight_);
+        //getResamplingRobotPose1(step_sum_weight_);
     }else{
         // std::cout << "not robot command" << std::endl;
     }
