@@ -66,6 +66,9 @@ private:
     bool sebscribed_particle_pose_ = false;
     bool subscribed_robot_command = false;
     bool initial_Time = true;
+    std::deque<double> est_x_history, est_y_history, est_yaw_history;
+    int smoothing_window_size = 20;
+
 
 public:
     PFVisualization(/* args */);
@@ -86,6 +89,7 @@ public:
     void getLikelihood_main(size_t marker_id);
     void getEstimatedRobotPose();
     void localization();
+    void AdaptiveGeneticAlgorithm();
     void getResamplingRobotPose0();
     void getResamplingRobotPose1(std::vector<double>& step_sum_weight_);
     void getResamplingRobotPose2(std::vector<double>& step_sum_weight_);
