@@ -17,6 +17,10 @@
 #include <nav_msgs/Odometry.h>
 #include <algorithm> 
 #include <fstream>
+#include <cstddef>
+#include <deque>
+#include <numeric>  // std::accumulate
+#include <chrono>
 
 class PFVisualization
 {

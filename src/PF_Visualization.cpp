@@ -1,12 +1,7 @@
 #include <PF_nav/PF_Visualization.h>
-#include <deque>
-#include <numeric>  // std::accumulate
-#include <random>
-#include <chrono>
-
 
 std::ofstream Likelihood_txt("/home/ros/catkin_ws/user/src/data/simulator/Likelihood.txt");
-std::ofstream Ess_txt("/home/ros/catkin_ws/user/src/data/simulator/Ess.txt");
+std::ofstream Ess_txt("/home/gucci/catkin_ws/user/src/data/simulator/Ess.txt");
 std::ofstream Estimate_position("/home/ros/catkin_ws/user/src/data/simulator/Estimate_position.csv");
 std::ofstream Robot_command("/home/ros/catkin_ws/user/src/data/simulator/Robot_command.csv");
 std::ofstream Pt_Position("/home/ros/catkin_ws/user/src/data/simulator/Pt_position.csv");
@@ -141,6 +136,8 @@ void PFVisualization::localization()
         {
             getLikelihood_main(marker_id);
         }
+
+        normLiklihood();
 
         getResamplingRobotPose1(step_sum_weight_);
     }else{
@@ -396,6 +393,7 @@ void PFVisualization::getLikelihood_main(size_t marker_id)
 
         Pt_atan = atan2(dis_Y_ , dis_X_);
         
+        double Local_dis_ = 0.0;
         double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_);
         double particle_angle = atan2(dis_Y_ , dis_X_) - particle.yaw;
         
@@ -571,14 +569,16 @@ void PFVisualization::AdaptiveGeneticAlgorithm()
         static_cast<unsigned>(std::chrono::steady_clock::now().time_since_epoch().count())
         );
 
-        std::uniform_int_distribution<std::size_t> dist(0, CH.size() - 1);
-        std::size_t idx = dist(rng);
+        if(!CH.empty()){
+            std::uniform_int_distribution<std::size_t> dist(0, CH.size() - 1);
+            std::size_t idx = dist(rng);
 
-        // CH からランダムに 1 つ抽出（削除はしない）
-        p.particle.x = Am * p.particle.x + (1 - Am) * CH[idx].particle.x;
-        p.particle.y = Am * p.particle.y + (1 - Am) * CH[idx].particle.y;
-        p.particle.yaw = Am * p.particle.yaw + (1 - Am) * CH[idx].particle.yaw;
-        
+             // CH からランダムに 1 つ抽出（削除はしない）
+            p.particle.x = Am * p.particle.x + (1 - Am) * CH[idx].particle.x;
+            p.particle.y = Am * p.particle.y + (1 - Am) * CH[idx].particle.y;
+            p.particle.yaw = Am * p.particle.yaw + (1 - Am) * CH[idx].particle.yaw;
+        }
+
         CS.push_back(p);
     }
 
@@ -594,20 +594,22 @@ void PFVisualization::AdaptiveGeneticAlgorithm()
 
         std::mt19937 rng(std::random_device{}());
 
-        std::uniform_real_distribution<double> dist(0.0, 1.0);
-        RL = dist(rng);
-        std::size_t idx = dist(rng);
-
-        if (RL <= Pm){
-            p.particle.x = 2 * CH[idx].particle.x - p.particle.x;
-            p.particle.y = 2 * CH[idx].particle.y - p.particle.y;
-            p.particle.yaw = 2 * CH[idx].particle.yaw - p.particle.yaw;
-        }else{
-            p.particle.x =  p.particle.x;
-            p.particle.y =  p.particle.y;
-            p.particle.yaw =  p.particle.yaw;
-        }
+        std::uniform_real_distribution<double> uni01(0.0, 1.0);
+        RL = uni01(rng);
         
+        if(!CH.empty()){
+            std::uniform_int_distribution<size_t> dist(0, CH.size()-1);
+            size_t idx = dist(rng);
+            if (RL <= Pm){
+                p.particle.x = 2 * CH[idx].particle.x - p.particle.x;
+                p.particle.y = 2 * CH[idx].particle.y - p.particle.y;
+                p.particle.yaw = 2 * CH[idx].particle.yaw - p.particle.yaw;
+            }else{
+                p.particle.x =  p.particle.x;
+                p.particle.y =  p.particle.y;
+                p.particle.yaw =  p.particle.yaw;
+            }
+        }
         CM.push_back(p);
     }
 
@@ -721,7 +723,6 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
     std::default_random_engine eng(rd());
     std::uniform_real_distribution<double> distr(0,step_sum_weight_[ particles_.size() - 1] / particles_.size());
     double darts = distr(eng);
-    darts = 0;
 
     int weight_num = 0;
     int step_num = 0;

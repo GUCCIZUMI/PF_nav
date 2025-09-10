@@ -21,6 +21,12 @@
          <param name="norm_noise_mean_angular_velocity"        value="0.0"/>
          <param name="norm_noise_variance_angular_velocity"    value="0.00111064"/>
 
+         <!-- Dead Eeckoning ノイズパラメータ --><!--contoroller_tutorial2のPkgのみ-->
+         <param name="norm_noise_mean_linear_dead_velocity"         value="0.0"/>
+         <param name="norm_noise_variance_linear_dead_velocity"     value="0.0000297694"/>
+         <param name="norm_noise_mean_angular_dead_velocity"        value="0.0"/>
+         <param name="norm_noise_variance_angular_dead_velocity"    value="0.00111064"/>
+
          <!-- パーティクルの初期配置におけるノイズパラメータ --><!-- PF_navのpkgのみ(contoroller_tutorialにはなし) -->
          <param name="norm_noise_mean_initial_particle_X"      value="0.0"/>
          <param name="norm_noise_variance_initial_particle_X"  value="0.1"/>
