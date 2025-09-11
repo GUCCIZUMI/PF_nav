@@ -42,6 +42,7 @@ PFVisualization::PFVisualization(/* args */)
     sub_marker_ = nh.subscribe("marker", 1000, &PFVisualization::markerCallback,this);
     sub_robot_pose_ = nh.subscribe("odom", 1000, &PFVisualization::robotPoseCallback,this);
     sub_robot_command_ = nh.subscribe("odom/truth", 1000, &PFVisualization::robotCommandCallback,this);
+    sub_Dead_command_ = nh.subscribe("odom/dead_reckoning", 1000, &PFVisualization::robotDeadCallback,this);
 
 
 	std::random_device rd;
@@ -101,8 +102,22 @@ void PFVisualization::robotPoseCallback(const nav_msgs::Odometry& odom_pose)
     
 }
 
+void PFVisualization::robotDeadCallback(const nav_msgs::Odometry& odom_dead_pose)
+{
+    robot_dead_velocity_ = odom_dead_pose.twist.twist.linear.x;
+    robot_dead_angular_velocity_ = odom_dead_pose.twist.twist.angular.z;
+}
+
 void PFVisualization::localization()
 {
+    static ros::Time last_time = ros::Time::now();  // 前ループの時刻を保持
+    ros::Time now = ros::Time::now();    
+    static int Loop_count = 0;  // ループ回数カウンタ
+    const int PF_Localization_Interval = 5; // 5回に1回PF更新
+
+    double dt = (now - last_time).toSec();         // 経過時間を秒で計算
+    last_time = now;
+
     if (initial_Time) {
         initialparticlepose();
     }
@@ -117,29 +132,42 @@ void PFVisualization::localization()
 
         updateParticles();
 
+        Loop_count++;
+
         std::vector<int> in_range_ids;
-        getObservedLandmark(in_range_ids);
-        initLiklihood();
-    
-        for (const auto& marker_id:in_range_ids)
+
+        bool Localization_PF = false;
+        if(Loop_count >= PF_Localization_Interval)
         {
-            getLikelihood_main(marker_id);
+            Loop_count = 0;
+            Localization_PF = true;
+
+            getObservedLandmark(in_range_ids);
+            initLiklihood();
+
+            for (const auto& marker_id:in_range_ids)
+            {
+                getLikelihood_main(marker_id);
+            }
+
+            normLiklihood();
+
+            getEstimatedRobotPose2(Localization_PF,dt);
+
+            AdaptiveGeneticAlgorithm();
+
+            for (const auto& marker_id:in_range_ids)
+            {
+                getLikelihood_main(marker_id);
+            }
+
+            normLiklihood();
+
+            getResamplingRobotPose1(step_sum_weight_);
+            
+        }else{
+            getEstimatedRobotPose2(Localization_PF,dt);
         }
-    
-        normLiklihood();
-
-        getEstimatedRobotPose();
-
-        AdaptiveGeneticAlgorithm();
-
-        for (const auto& marker_id:in_range_ids)
-        {
-            getLikelihood_main(marker_id);
-        }
-
-        normLiklihood();
-
-        getResamplingRobotPose1(step_sum_weight_);
     }else{
         // std::cout << "not robot command" << std::endl;
     }
@@ -182,10 +210,10 @@ void PFVisualization::initialparticlepose()
         p.x = p.x + initial_particle_Position_noise(generator);
         p.y = p.y + initial_particle_Position_noise(generator);
         p.yaw =  p.yaw  + initial_particle_yaw_noise(generator);
-        std::cout << p.x << p.y << p.yaw << std::endl;
+        // std::cout << p.x << p.y << p.yaw << std::endl;
 	}
     
-    std::cout << "パーティクル拡散" << std::endl;
+    // std::cout << "パーティクル拡散" << std::endl;
     initial_Time = false;    
 }
 
@@ -345,7 +373,7 @@ void PFVisualization::getLikelihood(size_t marker_id)
 
         Local_dis_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
 
-        std::cout << "スキャン距離" << Scan_distance_ << "パーティクル距離" << particle_distance << std::endl;
+        // std::cout << "スキャン距離" << Scan_distance_ << "パーティクル距離" << particle_distance << std::endl;
 
         double w_dis = 1/(sqrt(2 * M_PI * Local_dis_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*Local_dis_))+1e-100; 
 
@@ -410,7 +438,7 @@ void PFVisualization::getLikelihood_main(size_t marker_id)
             // Scan_distance_ = Scan_distance_ - 0.80; (2025-04-30なんでこの工程を入れたので残しておきます)
         }
 
-        std::cout << "スキャン距離" << Scan_distance_ << "パーティクル距離" << particle_distance << std::endl;
+        // std::cout << "スキャン距離" << Scan_distance_ << "パーティクル距離" << particle_distance << std::endl;
 
         double w_dis = 1/(sqrt(2 * M_PI * Local_dis_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*Local_dis_))+1e-100; 
 
@@ -439,7 +467,49 @@ void PFVisualization::getLikelihood_main(size_t marker_id)
         Likelihood_[j]*=weight;
                 
     }
-} 
+}
+
+void PFVisualization::getEstimatedRobotPose2(bool Localization_PF, double dt)
+{
+    nav_msgs::Odometry est_msg;
+    est_msg.header.stamp = ros::Time::now();
+    est_msg.header.frame_id = odom_msg_.header.frame_id;
+    est_msg.child_frame_id = odom_msg_.child_frame_id;
+    double PF_Estimate_position_x_ = 0.0;
+    double PF_Estimate_position_y_ = 0.0;
+    double PF_Estimate_position_yaw_ = 0.0;
+
+    if (Localization_PF) {
+        // === PFで推定 ===
+        for (size_t j = 0; j < particles_.size(); ++j) {
+            PF_Estimate_position_x_   += particles_[j].x   * Likelihood_[j];
+            PF_Estimate_position_y_   += particles_[j].y   * Likelihood_[j];
+            PF_Estimate_position_yaw_ += particles_[j].yaw * Likelihood_[j];
+        }
+
+        est_robot_pose_x_ = PF_Estimate_position_x_;
+        est_robot_pose_y_ = PF_Estimate_position_y_;
+        est_robot_pose_yaw_ = PF_Estimate_position_yaw_;
+
+        est_msg.pose.pose = potbot_lib::utility::get_pose(est_robot_pose_x_, est_robot_pose_y_, 0, 0, 0, est_robot_pose_yaw_);
+
+        Estmate_Count += 1;
+        std::cout << "--- Localization by Particle Filter ---" << Estmate_Count <<  std::endl;
+
+    } else {
+        est_robot_pose_x_   += robot_dead_velocity_ * cos(est_robot_pose_yaw_) * dt;
+        est_robot_pose_y_   += robot_dead_velocity_ * sin(est_robot_pose_yaw_) * dt;
+        est_robot_pose_yaw_ += robot_dead_angular_velocity_ * dt;
+
+        est_msg.pose.pose = potbot_lib::utility::get_pose(
+            est_robot_pose_x_, est_robot_pose_y_, 0, 0, 0, est_robot_pose_yaw_);
+
+        Estmate_Count += 1;
+        std::cout << "--- Localization by Dead Reckoning --- " << Estmate_Count << std::endl;
+    }
+
+    pub_estimated_robot_.publish(est_msg);
+}
 
 //重みの最適化過程、自己位置推定過程、リサンプリング過程--------------------------------------------------------------------------------------------------------------------------------------------
 void PFVisualization::getEstimatedRobotPose()
@@ -730,12 +800,12 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
     std::vector<potbot_lib::DiffDriveAgent> particles_tmp = particles_;
     
      
-    if ( Effective_Sample_Size > particles_.size() * 0.5)
+    if ( Effective_Sample_Size < particles_.size() * 0.5)
     {
-         ROS_INFO("Not Active Resampling");
+        //  ROS_INFO("Not Active Resampling");
     }else
     {
-        ROS_INFO("IN Active Resampling");
+        // ROS_INFO("IN Active Resampling");
         while(step_num <  particles_.size())
         {
             if(darts < step_sum_weight_[weight_num])

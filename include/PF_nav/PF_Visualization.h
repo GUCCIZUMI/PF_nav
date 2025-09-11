@@ -25,7 +25,7 @@
 class PFVisualization
 {
 private:
-    ros::Subscriber sub_marker_, sub_robot_pose_, sub_particle_pose_, sub_robot_command_;
+    ros::Subscriber sub_marker_, sub_robot_pose_, sub_particle_pose_, sub_robot_command_, sub_Dead_command_;
     ros::Publisher pub_estimated_robot_, pub_particles_, pub_particles_state_,  pub_odom_encoder_;
 
     nav_msgs::Odometry odom_msg_, odom_turu_msg_;
@@ -56,6 +56,8 @@ private:
     int Count_step_ = 0;
     double robot_pose_x_ = 0.0, robot_pose_y_ = 0.0, robot_pose_z_ = 0.0, robot_pose_yaw_ = 0.0; //ロボット位置の真値(定義)
     double robot_velocity_ = 0.0, robot_angular_velocity_ = 0.0; //ロボットの指令値(真値)
+    double robot_dead_velocity_ = 0.0, robot_dead_angular_velocity_ = 0.0;
+    double est_robot_pose_x_ = 0.0, est_robot_pose_y_ = 0.0, est_robot_pose_yaw_ = 0.0;
     double Robot_distance_ = 0.0, Robot_angle_ = 0.0; //ロボットとマーカーの距離と角度(角度に関してはロボット座標系における角度に変更する必要あるかも)
     double Scan_distance_ = 0.0, Scan_angle_ = 0.0; //ロボットから取得できるセンサ観測値
     double particle_position_x_ = 0.0, particle_position_y_ = 0.0, Particle_Est_RobotYaw_ = 0.0; //パーティクルの位置(使ってない)
@@ -65,6 +67,7 @@ private:
     double dis_var_ = 0.000856, ang_var_ = 0.000464; //正規の尤度関数に用いる分散値
     double total_weight_ = 0.0;
     double observe_scan_distance_error_ = 0.0; //変曲点に着目した距離分散変動判別数
+    double Estmate_Count = 0;
     bool sebscribed_robot_pose_ = false;
     bool sebscribed_landmark_pose_ = false;
     bool sebscribed_particle_pose_ = false;
@@ -84,6 +87,7 @@ public:
     void markerCallback(const visualization_msgs::MarkerArray& marker_array);
     void robotPoseCallback(const nav_msgs::Odometry& odom_pose);
     void robotCommandCallback(const nav_msgs::Odometry& odom_true_pose);
+    void robotDeadCallback(const nav_msgs::Odometry& odom_dead_pose);
     void updateParticles();
     
     void initLiklihood();
@@ -92,6 +96,7 @@ public:
     void getLikelihood(size_t marker_id);
     void getLikelihood_main(size_t marker_id);
     void getEstimatedRobotPose();
+    void getEstimatedRobotPose2(bool Localization_PF,double dt);
     void localization();
     void AdaptiveGeneticAlgorithm();
     void getResamplingRobotPose0();
