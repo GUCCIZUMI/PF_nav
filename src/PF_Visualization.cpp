@@ -772,75 +772,56 @@ void PFVisualization::getResamplingRobotPose0()
 //リサンプリング(鈴木ver)
 void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weight_)
 {
+    // --- 1. 累積和とESS計算 ---
     step_sum_weight_.clear();
     double step_weight = 0.0;
-    double Effective_Sample_Size = 0.0;
     double ESS_sum = 0.0;
     
-    for ( size_t i = 0; i < particles_.size(); ++i)
+    for (size_t i = 0; i < particles_.size(); ++i)
     {
-       step_weight += Likelihood_[i];
-       ESS_sum += Likelihood_[i] * Likelihood_[i];
-       step_sum_weight_.push_back(step_weight);
+        step_weight += Likelihood_[i];
+        ESS_sum += Likelihood_[i] * Likelihood_[i];
+        step_sum_weight_.push_back(step_weight);
     }
     
-    Effective_Sample_Size = 1 / ESS_sum;
-
-    Ess_txt << "Effective_Sample_Size_" <<  "  "  << Effective_Sample_Size << std::endl;
+    double Effective_Sample_Size = 1.0 / ESS_sum;
+    Ess_txt << "Effective_Sample_Size_  " << Effective_Sample_Size << std::endl;
     // ROS_INFO("Effective_Sample_Size_: %f", Effective_Sample_Size);
 
-    std::random_device rd;
-    std::default_random_engine eng(rd());
-    std::uniform_real_distribution<double> distr(0,step_sum_weight_[ particles_.size() - 1] / particles_.size());
-    double darts = distr(eng);
-
-    int weight_num = 0;
-    int step_num = 0;
-
-    std::vector<potbot_lib::DiffDriveAgent> particles_tmp = particles_;
-    
-     
-    if ( Effective_Sample_Size < particles_.size() * 0.5)
+    // --- 2. リサンプリング判定 ---
+    if (Effective_Sample_Size < particles_.size() * 0.2)
     {
-        //  ROS_INFO("Not Active Resampling");
-    }else
-    {
-        // ROS_INFO("IN Active Resampling");
-        while(step_num <  particles_.size())
+        std::vector<potbot_lib::DiffDriveAgent> particles_tmp = particles_;
+
+        // --- 3. Systematic Resampling ---
+        static std::default_random_engine eng(std::random_device{}());
+        double step = 1.0 / particles_.size();
+        std::uniform_real_distribution<double> dist(0.0, step);
+        double r = dist(eng);
+
+        int weight_num = 0;
+        for (size_t step_num = 0; step_num < particles_.size(); ++step_num)
         {
-            if(darts < step_sum_weight_[weight_num])
-            {
-
-                particles_[step_num].x = particles_tmp[weight_num].x;
-                particles_[step_num].y = particles_tmp[weight_num].y;
-                particles_[step_num].yaw = particles_tmp[weight_num].yaw;
-
-                // darts += (step_sum_weight_[ particles_.size() - 1] / particles_.size());
-                darts += 0.001;
-                step_num += 1;
-            }else
-            {
-                weight_num += 1;   
-            }
+            double u = r + step_num * step;
+            while (u > step_sum_weight_[weight_num]) weight_num++;
+            particles_[step_num] = particles_tmp[weight_num];
         }
 
-        double second_noise_mean_linear_velocity = 0;
-	    double second_noise_variance_linear_velocity = 0.01;
-	    double second_noise_mean_angular_velocity = 0;
-	    double second_noise_variance_angular_velocity = 0.01;
+        // --- 4. ノイズ付与（全パーティクル） ---
+        double linear_var = 0.01;
+        double angular_var = 0.01;
+        std::normal_distribution<double> dist_linear(0.0, sqrt(linear_var));
+        std::normal_distribution<double> dist_angular(0.0, sqrt(angular_var));
 
-        std::random_device rd3;
-        std::default_random_engine generator(rd3());
-        std::normal_distribution<double> distribution_linear_velocity_2(second_noise_mean_linear_velocity, sqrt(second_noise_variance_linear_velocity));
-	    std::normal_distribution<double> distribution_angular_velocity_2(second_noise_mean_angular_velocity, sqrt(second_noise_variance_angular_velocity));
-
-        for (size_t j = 1; j < particles_.size(); ++j)
-	    {
-            particles_[j].x = particles_[j].x + distribution_linear_velocity_2(generator);
-            particles_[j].y = particles_[j].y + distribution_linear_velocity_2(generator);
-            particles_[j].yaw = particles_[j].yaw + distribution_angular_velocity_2(generator);
-	    }
+        for (size_t j = 0; j < particles_.size(); ++j) // j=0 から全粒子
+        {
+            particles_[j].x += dist_linear(eng);
+            particles_[j].y += dist_linear(eng);
+            particles_[j].yaw += dist_angular(eng);
+        }
     }
+
+    // --- 5. 重みを均等に初期化 ---
     std::fill(Likelihood_.begin(), Likelihood_.end(), 1.0 / particles_.size());
 }
 //リサンプリング(赤井先生ver)
