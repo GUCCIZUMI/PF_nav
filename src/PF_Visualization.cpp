@@ -7,11 +7,14 @@ std::ofstream Robot_command("/home/ros/catkin_ws/user/src/data/simulator/Robot_c
 std::ofstream Pt_Position("/home/ros/catkin_ws/user/src/data/simulator/Pt_position.csv");
 std::ofstream Robot_angle("/home/ros/catkin_ws/user/src/data/simulator/Robot_angle.csv");
 std::ofstream Particle_angle("/home/ros/catkin_ws/user/src/data/simulator/Particle_angle.csv");
+std::ofstream Particle_angle_2nd("/home/ros/catkin_ws/user/src/data/simulator/Particle_angle.csv");
 std::ofstream CH_Particle("/home/gucci/catkin_ws/user/src/data/simulator/CH_Particle.csv");
 std::ofstream CL_Particle("/home/gucci/catkin_ws/user/src/data/simulator/CL_Particle.csv");
 std::ofstream CS_Particle("/home/gucci/catkin_ws/user/src/data/simulator/CS_Particle.csv");
 std::ofstream CM_Particle("/home/gucci/catkin_ws/user/src/data/simulator/CM_Particle.csv");
 std::ofstream CP_Particle("/home/gucci/catkin_ws/user/src/data/simulator/CP_Particle.csv");
+std::ofstream Marker_Scan("/home/gucci/catkin_ws/user/src/data/simulator/Marker_Scan.txt");
+std::ofstream Likelihood_Scan("/home/gucci/catkin_ws/user/src/data/simulator/Likelihood_Scan.txt");
 
 
 int Pt_idx = 0;
@@ -144,11 +147,14 @@ void PFVisualization::localization()
 
             getObservedLandmark(in_range_ids);
             initLiklihood();
-
+            
+            Scan_Count_ += 1;
+            Likelihood_Scan << "---Likelihood Scan 開始---" << "実行回数:" << Scan_Count_ << std::endl;
             for (const auto& marker_id:in_range_ids)
             {
                 getLikelihood_main(marker_id);
             }
+            Likelihood_Scan << "---Likelihood Scan 終了---" << std::endl;
 
             normLiklihood();
 
@@ -158,7 +164,7 @@ void PFVisualization::localization()
 
             for (const auto& marker_id:in_range_ids)
             {
-                getLikelihood_main(marker_id);
+                getLikelihood_2nd(marker_id);
             }
 
             normLiklihood();
@@ -280,8 +286,14 @@ void PFVisualization::getObservedLandmark(std::vector<int>& in_range)
     std::normal_distribution<double> distribution_Scan_Long_distance(norm_noise_mean_Scan_Long_distance, sqrt(norm_noise_variance_Scan_Long_distance));
 
     in_range.clear();
+    robot_distances_.clear();
+    robot_scan_distances_.clear();
+    robot_angles_.clear();
+    robot_scan_angles_.clear();
 
     double Robot_atan = 0.0;
+
+    Marker_Scan << "---Marker Scan 開始---" << "実行回数" << Scan_Count_ << std::endl;
 
     for(size_t i = 0; i < marker_positions_.size(); ++i)
     {
@@ -334,16 +346,17 @@ void PFVisualization::getObservedLandmark(std::vector<int>& in_range)
         // if((start_angle_ < end_angle_ && start_angle_ <= Robot_angle_ && Robot_angle_ <= end_angle_) || 
         //     (start_angle_ >= end_angle_ && (start_angle_ <= Robot_angle_ || 
         //     Robot_angle_ <= end_angle_)))
+
+        Marker_Scan <<  " マーカ番号 "  << marker_ids_[i] << "スキャン距離" << Scan_distance_ << "スキャン角度" << Scan_angle_ << std::endl;
+
         if (abs(Robot_angle_) <= angle_area_ && Robot_distance_ <= radius_)
         {
-            in_range.push_back(marker_ids_[i]);
+            in_range.push_back(static_cast<int>(i));
         }
     } 
 
-    robot_distances_.clear();
-    robot_scan_distances_.clear();
-    robot_angles_.clear();
-    robot_scan_angles_.clear();
+    Marker_Scan << "---Marker Scan 終了---" << std::endl;
+
 }
 
 //マーカー、パーティクル間誤差、従来法による尤度計算(距離、角度)
@@ -412,6 +425,8 @@ void PFVisualization::getLikelihood_main(size_t marker_id)
     double Pt_atan = 0.0;
     Pt_idx += 1;
 
+    Likelihood_Scan << "マーカID:" << marker_ids_[marker_id] << "スキャン距離:" << Scan_distance_ << "スキャン角度:" << Scan_angle_ << std::endl;
+
     for (size_t j = 0; j < particles_.size(); ++j)
     {
         const auto & particle = particles_[j]; 
@@ -426,6 +441,71 @@ void PFVisualization::getLikelihood_main(size_t marker_id)
         double particle_angle = atan2(dis_Y_ , dis_X_) - particle.yaw;
         
         Particle_angle <<  " マーカ番号 "  << marker_ids_[marker_id] <<  " atan角度 "  << Pt_atan << " パーティクルID " << j <<  " パーティクル姿勢 "  << particle.yaw << " 計算後の尤度角度 "  << particle_angle << " 処理番号 " << Pt_idx << std :: endl;
+
+        Local_dis_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
+        
+        //変曲点に着目した距離分散変動
+        observe_scan_distance_error_ = abs(abs(Scan_distance_)-abs(particle_distance));
+
+        if (abs(abs(Scan_distance_)-abs(particle_distance))>0.8&&abs(abs(Scan_distance_)-abs(particle_distance))<1.3)
+        {
+            Local_dis_=abs(abs(Scan_distance_)-abs(particle_distance))*abs(abs(Scan_distance_)-abs(particle_distance));
+            // Scan_distance_ = Scan_distance_ - 0.80; (2025-04-30なんでこの工程を入れたので残しておきます)
+        }
+
+        // std::cout << "スキャン距離" << Scan_distance_ << "パーティクル距離" << particle_distance << std::endl;
+
+        double w_dis = 1/(sqrt(2 * M_PI * Local_dis_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*Local_dis_))+1e-100; 
+
+        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - particle_angle ) * ( Scan_angle_ - particle_angle )) / (2 * ang_var_))+1e-100;
+
+        if (Scan_distance_ == 0)
+        {
+            w_dis = 1;
+        }
+        
+        if (Scan_angle_ == 0)
+        {
+            w_ang = 1;
+        }
+
+        if (abs(abs(Scan_distance_)-abs(particle_distance))>1.3)
+        {
+            w_dis=1;
+        }
+        
+        double w_dis_log = log10(w_dis);
+        double w_ang_log = log10(w_ang);
+
+        double weight = exp(w_dis_log + w_ang_log);
+
+        Likelihood_[j]*=weight;
+                
+    }
+}
+
+void PFVisualization::getLikelihood_2nd(size_t marker_id)
+{
+    const auto& marker = marker_positions_[marker_id];
+    double Scan_distance_ = robot_scan_distances_[marker_id];
+    double Scan_angle_ = robot_scan_angles_[marker_id];
+    double Pt_atan = 0.0;
+    Pt_idx += 1;
+
+    for (size_t j = 0; j < particles_.size(); ++j)
+    {
+        const auto & particle = particles_[j]; 
+
+        dis_X_ = marker.position.x - particle.x; //マーカとパーティクルのx座標距離(予測値の距離：推定値)
+        dis_Y_ = marker.position.y - particle.y; //マーカとパーティクルのy座標距離(予測値の距離：推定値)
+
+        Pt_atan = atan2(dis_Y_ , dis_X_);
+        
+        double Local_dis_ = 0.0;
+        double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_);
+        double particle_angle = atan2(dis_Y_ , dis_X_) - particle.yaw;
+        
+        Particle_angle_2nd <<  " マーカ番号 "  << marker_ids_[marker_id] <<  " atan角度 "  << Pt_atan << " パーティクルID " << j <<  " パーティクル姿勢 "  << particle.yaw << " 計算後の尤度角度 "  << particle_angle << " 処理番号 " << Pt_idx << std :: endl;
 
         Local_dis_ = dis_var_ * dis_X_ * dis_X_;  //尤度関数分散値の変更式(実機の方に実装されている分散はこっち)
         
@@ -493,8 +573,8 @@ void PFVisualization::getEstimatedRobotPose2(bool Localization_PF, double dt)
 
         est_msg.pose.pose = potbot_lib::utility::get_pose(est_robot_pose_x_, est_robot_pose_y_, 0, 0, 0, est_robot_pose_yaw_);
 
-        Estmate_Count += 1;
-        std::cout << "--- Localization by Particle Filter ---" << Estmate_Count <<  std::endl;
+        Estmate_Count_ += 1;
+        std::cout << "--- Localization by Particle Filter ---" << Estmate_Count_ <<  std::endl;
 
     } else {
         est_robot_pose_x_   += robot_dead_velocity_ * cos(est_robot_pose_yaw_) * dt;
@@ -504,8 +584,8 @@ void PFVisualization::getEstimatedRobotPose2(bool Localization_PF, double dt)
         est_msg.pose.pose = potbot_lib::utility::get_pose(
             est_robot_pose_x_, est_robot_pose_y_, 0, 0, 0, est_robot_pose_yaw_);
 
-        Estmate_Count += 1;
-        std::cout << "--- Localization by Dead Reckoning --- " << Estmate_Count << std::endl;
+        Estmate_Count_ += 1;
+        std::cout << "--- Localization by Dead Reckoning --- " << Estmate_Count_ << std::endl;
     }
 
     pub_estimated_robot_.publish(est_msg);

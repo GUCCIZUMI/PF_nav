@@ -67,7 +67,8 @@ private:
     double dis_var_ = 0.000856, ang_var_ = 0.000464; //正規の尤度関数に用いる分散値
     double total_weight_ = 0.0;
     double observe_scan_distance_error_ = 0.0; //変曲点に着目した距離分散変動判別数
-    double Estmate_Count = 0;
+    double Estmate_Count_ = 0;
+    double Scan_Count_ = 0;
     bool sebscribed_robot_pose_ = false;
     bool sebscribed_landmark_pose_ = false;
     bool sebscribed_particle_pose_ = false;
@@ -95,6 +96,7 @@ public:
     void getObservedLandmark(std::vector<int>& in_range);
     void getLikelihood(size_t marker_id);
     void getLikelihood_main(size_t marker_id);
+    void getLikelihood_2nd(size_t marker_id);
     void getEstimatedRobotPose();
     void getEstimatedRobotPose2(bool Localization_PF,double dt);
     void localization();
