@@ -22,6 +22,16 @@
 #include <numeric>  // std::accumulate
 #include <chrono>
 
+struct ObservedMarker {
+    size_t id;       // マーカID
+    double distance; // スキャン距離（ノイズ入り）
+    double angle;    // スキャン角度（ノイズ入り）
+
+    // コンストラクタも付けられる（省略可能）
+    ObservedMarker(size_t id_ = 0, double distance_ = 0.0, double angle_ = 0.0)
+        : id(id_), distance(distance_), angle(angle_) {}
+};
+
 class PFVisualization
 {
 private:
@@ -49,6 +59,7 @@ private:
     std::vector<double> robot_angles_; //範囲内マーカーのロボットとマーカー角度
     std::vector<double> robot_scan_distances_; //範囲内マーカーのロボットとマーカーの観測距離
     std::vector<double> robot_scan_angles_; //範囲内マーカーのロボットとマーカー観測角度
+    std::vector<ObservedMarker> observed_markers;
     //std::vector<double> particle_position_x; //各パーティクルのx座標
     //std::vector<double> particle_position_y; //各パーティクルのx座標
     //std::vector<double> particle_position_yaw; //各パーティクルのx座標
@@ -93,10 +104,10 @@ public:
     
     void initLiklihood();
     void normLiklihood(); 
-    void getObservedLandmark(std::vector<int>& in_range);
+    void getObservedLandmark(std::vector<ObservedMarker>& observed_markers);
     void getLikelihood(size_t marker_id);
-    void getLikelihood_main(size_t marker_id);
-    void getLikelihood_2nd(size_t marker_id);
+    void getLikelihood_main(const ObservedMarker& in_range_Marker);
+    void getLikelihood_2nd(const ObservedMarker& in_range_Marker);
     void getEstimatedRobotPose();
     void getEstimatedRobotPose2(bool Localization_PF,double dt);
     void localization();
