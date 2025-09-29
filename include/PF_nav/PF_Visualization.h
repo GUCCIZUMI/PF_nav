@@ -79,7 +79,10 @@ private:
     double total_weight_ = 0.0;
     double observe_scan_distance_error_ = 0.0; //変曲点に着目した距離分散変動判別数
     double Estmate_Count_ = 0;
+    double PF_Estimate_Count_ = 0;
     double Scan_Count_ = 0;
+    double avg_theta = 0.0;
+    double avg_theta2 = 0.0;
     bool sebscribed_robot_pose_ = false;
     bool sebscribed_landmark_pose_ = false;
     bool sebscribed_particle_pose_ = false;
@@ -87,6 +90,7 @@ private:
     bool initial_Time = true;
     std::deque<double> est_x_history, est_y_history, est_yaw_history;
     int smoothing_window_size = 20;
+    int Assessment_count_ = 0;
 
 
 public:
@@ -115,6 +119,8 @@ public:
     void getResamplingRobotPose0();
     void getResamplingRobotPose1(std::vector<double>& step_sum_weight_);
     void getResamplingRobotPose2(std::vector<double>& step_sum_weight_);
+
+    double wrapAngle(double angle);
 };
 
 #endif

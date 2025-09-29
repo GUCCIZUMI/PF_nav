@@ -1,10 +1,17 @@
 #include <PF_nav/PF_Visualization.h>
 
 std::ofstream Likelihood_txt("/home/ros/catkin_ws/user/src/data/simulator/Likelihood.txt");
+std::ofstream GA_Likelihood_txt("/home/ros/catkin_ws/user/src/data/simulator/GA_Likelihood.txt");
 std::ofstream Ess_txt("/home/ros/catkin_ws/user/src/data/simulator/Ess.txt");
+std::ofstream GA_Ess_txt("/home/ros/catkin_ws/user/src/data/simulator/GA_Ess.txt");
+std::ofstream kakunin_Ess_sum_txt("/home/ros/catkin_ws/user/src/data/simulator/kakunin_Ess_sum.txt");
+std::ofstream GA_kakunin_Ess_sum_txt("/home/ros/catkin_ws/user/src/data/simulator/GA_kakunin_Ess_sum.txt");
 std::ofstream Estimate_position("/home/ros/catkin_ws/user/src/data/simulator/Estimate_position.csv");
 std::ofstream Robot_command("/home/ros/catkin_ws/user/src/data/simulator/Robot_command.csv");
 std::ofstream Pt_Position("/home/ros/catkin_ws/user/src/data/simulator/Pt_position.csv");
+std::ofstream GA_Pt_Position("/home/ros/catkin_ws/user/src/data/simulator/GA_Pt_position.csv");
+std::ofstream Pt_yaw("/home/ros/catkin_ws/user/src/data/simulator/Pt_yaw.txt");
+std::ofstream Pt_yaw2("/home/ros/catkin_ws/user/src/data/simulator/Pt_yaw2.txt");
 std::ofstream Robot_angle("/home/ros/catkin_ws/user/src/data/simulator/Robot_angle.csv");
 std::ofstream Particle_angle("/home/ros/catkin_ws/user/src/data/simulator/Particle_angle.csv");
 std::ofstream Particle_angle_2nd("/home/ros/catkin_ws/user/src/data/simulator/Particle_angle.csv");
@@ -15,6 +22,7 @@ std::ofstream CM_Particle("/home/ros/catkin_ws/user/src/data/simulator/CM_Partic
 std::ofstream CP_Particle("/home/ros/catkin_ws/user/src/data/simulator/CP_Particle.csv");
 std::ofstream Marker_Scan("/home/ros/catkin_ws/user/src/data/simulator/Marker_Scan.txt");
 std::ofstream Likelihood_Scan("/home/ros/catkin_ws/user/src/data/simulator/Likelihood_Scan.txt");
+std::ofstream Element_yaw("/home/ros/catkin_ws/user/src/data/simulator/Element_yaw.txt");
 
 
 int Pt_idx = 0;
@@ -129,10 +137,6 @@ void PFVisualization::localization()
     
     if(subscribed_robot_command){
         
-        Count_step_ = Count_step_ + 1;
-        Likelihood_txt <<  " 実行回数 "  << Count_step_ << std :: endl;
-        Pt_Position <<  " 実行回数 "  << Count_step_ <<  " 実行回数 "  << Count_step_ <<  " 実行回数 "  << Count_step_ << std :: endl;
-
         updateParticles();
 
         Loop_count++;
@@ -142,13 +146,19 @@ void PFVisualization::localization()
         bool Localization_PF = false;
         if(Loop_count >= PF_Localization_Interval)
         {
+            Count_step_ = Count_step_ + 1;
+            Likelihood_txt <<  " 実行回数 "  << Count_step_ << std :: endl;
+            GA_Likelihood_txt <<  " 実行回数 "  << Count_step_ << std :: endl;
+            Pt_Position <<  " 実行回数 "  << Count_step_ <<  " 実行回数 "  << Count_step_ <<  " 実行回数 "  << Count_step_ << std :: endl;
+            GA_Pt_Position <<  " 実行回数 "  << Count_step_ <<  " 実行回数 "  << Count_step_ <<  " 実行回数 "  << Count_step_ << std :: endl;
+
             Loop_count = 0;
             Localization_PF = true;
-
+            
+            Scan_Count_ += 1;
             getObservedLandmark(observed_markers);
             initLiklihood();
             
-            Scan_Count_ += 1;
             Likelihood_Scan << "---Likelihood Scan 開始---" << "実行回数:" << Scan_Count_ << std::endl;
             for (const auto& in_range_Marker:observed_markers)
             {
@@ -160,14 +170,14 @@ void PFVisualization::localization()
 
             getEstimatedRobotPose2(Localization_PF,dt);
 
-            AdaptiveGeneticAlgorithm();
+            // AdaptiveGeneticAlgorithm();
 
-            for (const auto& in_range_Marker:observed_markers)
-            {
-                getLikelihood_2nd(in_range_Marker);
-            }
+            // for (const auto& in_range_Marker:observed_markers)
+            // {
+            //     getLikelihood_2nd(in_range_Marker);
+            // }
 
-            normLiklihood();
+            // normLiklihood();
 
             getResamplingRobotPose1(step_sum_weight_);
             
@@ -225,26 +235,69 @@ void PFVisualization::initialparticlepose()
 
 void PFVisualization::updateParticles()
 {
+    size_t yaw_out_of_range_count = 0;  // 呼び出しごとにリセット
+    size_t yaw_out_of_range_count2 = 0;  // 呼び出しごとにリセット
+    Assessment_count_ += 1;
+
+    double sum_theta = 0.0;
+    double sum_theta2 = 0.0;
     geometry_msgs::PoseArray particles_msg;
-    for (auto& p:particles_)
+    Pt_yaw << " ---yaw角査定 " << Assessment_count_ << " 回目---" << std::endl;
+    Pt_yaw2 << " ---yaw角査定 " << Assessment_count_ << " 回目---" << std::endl;
+
+
+    for (auto& p : particles_)
     {
         double v = odom_msg_.twist.twist.linear.x;
         double omega = odom_msg_.twist.twist.angular.z;
         p.v = v;
         p.omega = omega;
-        p.deltatime = 1.0/50.0;
+        p.deltatime = 1.0 / 50.0;
         p.update();
 
+        double theta = p.yaw;
+        sum_theta += theta;
+
+        // 範囲チェックのみ
+        if (!(theta >= -M_PI && theta < M_PI))
+        {
+            yaw_out_of_range_count++;
+            Pt_yaw << " [警告] yaw角が範囲外: " << theta << std::endl;
+            // 正規化処理 [-π, π) に収める
+            while (theta >= M_PI) theta -= 2.0 * M_PI;
+            while (theta < -M_PI) theta += 2.0 * M_PI;
+
+            p.yaw = theta;  // 正規化後の値を代入
+        }
+
+        double theta2 = p.yaw;
+
+        if (!(theta2 >= -M_PI && theta2 < M_PI))
+        {
+            yaw_out_of_range_count2++;
+            Pt_yaw2 << " [警告] yaw角が範囲外: " << theta2 << std::endl;
+        }
+        
+        sum_theta2 += theta2;
+        
         nav_msgs::Odometry p_msg;
-        potbot_lib::utility::to_msg(p, p_msg); //p.to_msg(p_msg);
+        potbot_lib::utility::to_msg(p, p_msg);
         particles_msg.poses.push_back(p_msg.pose.pose);
     }
-    
+
     particles_msg.header.frame_id = "map";
     particles_msg.header.stamp = ros::Time::now();
-
     pub_particles_.publish(particles_msg);
 
+    avg_theta = sum_theta / particles_.size();
+    avg_theta2 = sum_theta2 / particles_.size();
+    Pt_yaw << " ---yaw角査定終了--- "
+           << " パーティクル平均角度 " << avg_theta
+           << " (範囲外カウント: " << yaw_out_of_range_count << ")\n";
+
+    Pt_yaw2 << " ---yaw角査定終了--- "
+           << " パーティクル平均角度 " << avg_theta2
+           << " (範囲外カウント: " << yaw_out_of_range_count2 << ")\n";
 }
 
 void PFVisualization::initLiklihood()
@@ -260,29 +313,35 @@ void PFVisualization::normLiklihood()
     for(auto& val:Likelihood_) val/=sum;
 }
 
+double PFVisualization::wrapAngle(double angle) {
+    while (angle > M_PI)  angle -= 2.0 * M_PI;
+    while (angle < -M_PI) angle += 2.0 * M_PI;
+    return angle;
+}
+
 //範囲内マーカー観測プロセス
 void PFVisualization::getObservedLandmark(std::vector<ObservedMarker>& observed_markers)
 {
     ros::NodeHandle n("~");
 
     double norm_noise_mean_Scan_distance = 0;
-	double norm_noise_variance_Scan_distance = 0.1;
-	double norm_noise_mean_Scan_angle = 0;
-	double norm_noise_variance_Scan_angle = 0.1;
-    double norm_noise_mean_Scan_Long_distance = 0; //遠距離(5m < d < 8m)における観測ノイズ(平均)
-    double norm_noise_variance_Scan_Long_distance = 0; //遠距離(5m < d < 8m)における観測ノイズ(分散)
+    double norm_noise_variance_Scan_distance = 0.1;
+    double norm_noise_mean_Scan_angle = 0;
+    double norm_noise_variance_Scan_angle = 0.1;
+    double norm_noise_mean_Scan_Long_distance = 0;
+    double norm_noise_variance_Scan_Long_distance = 0;
 
     n.getParam("norm_noise_mean_Scan_distance", norm_noise_mean_Scan_distance);
-	n.getParam("norm_noise_variance_Scan_distance", norm_noise_variance_Scan_distance);
-	n.getParam("norm_noise_mean_Scan_angle", norm_noise_mean_Scan_angle);
-	n.getParam("norm_noise_variance_Scan_angle", norm_noise_variance_Scan_angle);
+    n.getParam("norm_noise_variance_Scan_distance", norm_noise_variance_Scan_distance);
+    n.getParam("norm_noise_mean_Scan_angle", norm_noise_mean_Scan_angle);
+    n.getParam("norm_noise_variance_Scan_angle", norm_noise_variance_Scan_angle);
     n.getParam("norm_noise_mean_Scan_Long_distance", norm_noise_mean_Scan_Long_distance);
     n.getParam("norm_noise_variance_Scan_Long_distance", norm_noise_variance_Scan_Long_distance);
      
     std::random_device rd2;
     std::default_random_engine generator(rd2());
     std::normal_distribution<double> distribution_Scan_distance(norm_noise_mean_Scan_distance, sqrt(norm_noise_variance_Scan_distance));
-	std::normal_distribution<double> distribution_Scan_angle(norm_noise_mean_Scan_angle, sqrt(norm_noise_variance_Scan_angle));
+    std::normal_distribution<double> distribution_Scan_angle(norm_noise_mean_Scan_angle, sqrt(norm_noise_variance_Scan_angle));
     std::normal_distribution<double> distribution_Scan_Long_distance(norm_noise_mean_Scan_Long_distance, sqrt(norm_noise_variance_Scan_Long_distance));
 
     robot_distances_.clear();
@@ -293,75 +352,82 @@ void PFVisualization::getObservedLandmark(std::vector<ObservedMarker>& observed_
 
     double Robot_atan = 0.0;
 
+    Element_yaw << "---角度確認 開始---" << "実行回数" << Scan_Count_ << std::endl;
+    Element_yaw << " パーティクル平均角度: " << avg_theta 
+                << " ロボット角度: " << robot_pose_yaw_ << std::endl;
+    Element_yaw << "---角度確認 終了---" << std::endl;
+
     Marker_Scan << "---Marker Scan 開始---" << "実行回数" << Scan_Count_ << std::endl;
 
+    
+    auto inFOV = [&](double marker_angle, double robot_yaw, double fov_rad) {
+        double start_angle = wrapAngle(robot_yaw - fov_rad / 2.0);
+        double end_angle   = wrapAngle(robot_yaw + fov_rad / 2.0);
+        marker_angle = wrapAngle(marker_angle);
+
+        if (start_angle <= end_angle) {
+            return (marker_angle >= start_angle && marker_angle <= end_angle);
+        } else {
+            // 2πを跨ぐ場合
+            return (marker_angle >= start_angle || marker_angle <= end_angle);
+        }
+    };
+
+    // ---- マーカごとの処理 ----
     for(size_t i = 0; i < marker_positions_.size(); ++i)
     {
         const auto& marker_pose = marker_positions_[i];
-        double dx = marker_pose.position.x - robot_pose_x_; //マーカーとロボットのx座標距離(真値の距離：センサ値)
-        double dy = marker_pose.position.y - robot_pose_y_; //マーカーとロボットのy座標距離(真値の距離：センサ値)
-        Robot_distance_ = std::sqrt(dx * dx + dy * dy); //マーカーとロボットの直線距離(真値の距離：センサ値)
+        double dx = marker_pose.position.x - robot_pose_x_;
+        double dy = marker_pose.position.y - robot_pose_y_;
+
+        Robot_distance_ = std::sqrt(dx * dx + dy * dy);
         robot_distances_.push_back(Robot_distance_);
 
+        // 距離に応じてノイズを付与
         if(Robot_distance_ <= 5.0){
-            Scan_distance_ = Robot_distance_ + distribution_Scan_distance(generator); //マーカーとロボットの直線距離(真値の距離(近距離)：ノイズ入りセンサ値)
-        }else if(Robot_distance_ > 5.0 &&  Robot_distance_ <= 8.0){
-            Scan_distance_ = Robot_distance_ + distribution_Scan_Long_distance(generator); //マーカーとロボットの直線距離(真値の距離(遠距離)：ノイズ入りセンサ値)
-        }else{
-            Scan_distance_ = 0; //マーカーとロボットの直線距離(真値の距離(それ以外)：ノイズ入りセンサ値)
+            Scan_distance_ = Robot_distance_ + distribution_Scan_distance(generator);
+        } else if(Robot_distance_ > 5.0 &&  Robot_distance_ <= 8.0){
+            Scan_distance_ = Robot_distance_ + distribution_Scan_Long_distance(generator);
+        } else {
+            Scan_distance_ = 0;
         }
-
         robot_scan_distances_.push_back(Scan_distance_);
 
         if(Robot_distance_ > radius_){
             continue;
         }
         
-        Robot_atan = std::atan2(dy, dx);
+        // マーカ方向（世界座標系 → ロボット基準角度）
+        Robot_atan   = std::atan2(dy, dx);
+        Robot_angle_ = wrapAngle(Robot_atan - robot_pose_yaw_);
+
         Robot_idx += 1;
-        Robot_angle_ = std::atan2(dy, dx) - robot_pose_yaw_; //マーカーとロボットの角度(真値の角度：センサ値)
-        Robot_angle <<  " マーカ番号 "  << marker_ids_[i] <<  " atan角度 "  << Robot_atan <<  " ロボット姿勢 "  << robot_pose_yaw_ << " 計算後の尤度角度 " << Robot_angle_ << " 処理番号 " << Robot_idx << std :: endl;
+        Robot_angle << " マーカ番号 "  << marker_ids_[i] 
+                    << " atan角度 "    << Robot_atan 
+                    << " ロボット姿勢 " << robot_pose_yaw_ 
+                    << " 計算後の尤度角度 " << Robot_angle_ 
+                    << " 処理番号 " << Robot_idx << std::endl;
         
         robot_angles_.push_back(Robot_angle_);
 
-        Scan_angle_ = Robot_angle_ + distribution_Scan_angle(generator); //マーカーとロボットの角度(真値の角度：ノイズ入りセンサ値)
+        // 角度ノイズを加える
+        Scan_angle_ = Robot_angle_ + distribution_Scan_angle(generator);
         robot_scan_angles_.push_back(Scan_angle_);
 
-        // if (Robot_angle_ < 0){
-        //     Robot_angle_ += 2 * M_PI;
-        // }
-        
-        // record_angle << Robot_angle_  << std :: endl;
-
-        // double start_angle_ = robot_pose_yaw_ - angle_area_ / 2;
-        // double end_angle_ = robot_pose_yaw_ + angle_area_ / 2;
-        
-        // record_start_angle_ << start_angle_  << std :: endl;
-        // record_end_angle_ << end_angle_  << std :: endl;
-        // record_robot_pose_yaw << robot_pose_yaw   << std :: endl;
-
-        // if (start_angle_ < 0) start_angle_ += 2 * M_PI;
-        // if (end_angle_ >= 2 * M_PI) end_angle_ -= 2 * M_PI;
-        
-        // if((start_angle_ < end_angle_ && start_angle_ <= Robot_angle_ && Robot_angle_ <= end_angle_) || 
-        //     (start_angle_ >= end_angle_ && (start_angle_ <= Robot_angle_ || 
-        //     Robot_angle_ <= end_angle_)))
-
-        
-
-        if (abs(Robot_angle_) <= angle_area_ && Robot_distance_ <= radius_)
-        {
-            Marker_Scan <<  " マーカ番号 "  << marker_ids_[i] << "スキャン距離" << Scan_distance_ << "スキャン角度" << Scan_angle_ << std::endl;
+        // ---- 視野判定 ----
+        if (inFOV(Robot_atan, robot_pose_yaw_, angle_area_) && Robot_distance_ <= radius_) {
+            Marker_Scan << " マーカID: " << marker_ids_[i] 
+                        << " スキャン距離: " << Scan_distance_ 
+                        << " スキャン角度: " << Scan_angle_ << std::endl;
             ObservedMarker m;
-            m.id = marker_ids_[i];   // 元のIDを保持
-            m.distance = Scan_distance_; // 必要ならノイズ加算
-            m.angle = Scan_angle_;     // 必要ならノイズ加算
+            m.id = marker_ids_[i];
+            m.distance = Scan_distance_;
+            m.angle = Scan_angle_;
             observed_markers.push_back(m);
         }
     } 
 
     Marker_Scan << "---Marker Scan 終了---" << std::endl;
-
 }
 
 //マーカー、パーティクル間誤差、従来法による尤度計算(距離、角度)
@@ -430,7 +496,7 @@ void PFVisualization::getLikelihood_main(const ObservedMarker& in_range_Marker)
     double Pt_atan = 0.0;
     Pt_idx += 1;
 
-    Likelihood_Scan << "マーカID:" << marker_ids_[in_range_Marker.id] << "スキャン距離:" << Scan_distance_ << "スキャン角度:" << Scan_angle_ << std::endl;
+    Likelihood_Scan << " マーカID: " << marker_ids_[in_range_Marker.id] << " スキャン距離: " << Scan_distance_ << " スキャン角度: " << Scan_angle_ << std::endl;
 
     for (size_t j = 0; j < particles_.size(); ++j)
     {
@@ -443,7 +509,8 @@ void PFVisualization::getLikelihood_main(const ObservedMarker& in_range_Marker)
         
         double Local_dis_ = 0.0;
         double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_);
-        double particle_angle = atan2(dis_Y_ , dis_X_) - particle.yaw;
+        double particle_angle_atan = atan2(dis_Y_, dis_X_) - particle.yaw;
+        double particle_angle = wrapAngle(Scan_angle_ - particle_angle_atan);
         
         Particle_angle <<  " マーカ番号 "  << marker_ids_[in_range_Marker.id] <<  " atan角度 "  << Pt_atan << " パーティクルID " << j <<  " パーティクル姿勢 "  << particle.yaw << " 計算後の尤度角度 "  << particle_angle << " 処理番号 " << Pt_idx << std :: endl;
 
@@ -462,7 +529,7 @@ void PFVisualization::getLikelihood_main(const ObservedMarker& in_range_Marker)
 
         double w_dis = 1/(sqrt(2 * M_PI * Local_dis_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*Local_dis_))+1e-100; 
 
-        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - particle_angle ) * ( Scan_angle_ - particle_angle )) / (2 * ang_var_))+1e-100;
+        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(particle_angle * particle_angle) / (2 * ang_var_))+1e-100;
 
         if (Scan_distance_ == 0)
         {
@@ -485,7 +552,7 @@ void PFVisualization::getLikelihood_main(const ObservedMarker& in_range_Marker)
         double weight = exp(w_dis_log + w_ang_log);
 
         Likelihood_[j]*=weight;
-                
+        Likelihood_txt << "尤度" << " " << Likelihood_[j] << std::endl;        
     }
 }
 
@@ -508,7 +575,8 @@ void PFVisualization::getLikelihood_2nd(const ObservedMarker& in_range_Marker)
         
         double Local_dis_ = 0.0;
         double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_);
-        double particle_angle = atan2(dis_Y_ , dis_X_) - particle.yaw;
+        double particle_angle_atan = atan2(dis_Y_, dis_X_) - particle.yaw;
+        double particle_angle = wrapAngle(Scan_angle_ - particle_angle_atan);
         
         Particle_angle_2nd <<  " マーカ番号 "  << marker_ids_[in_range_Marker.id] <<  " atan角度 "  << Pt_atan << " パーティクルID " << j <<  " パーティクル姿勢 "  << particle.yaw << " 計算後の尤度角度 "  << particle_angle << " 処理番号 " << Pt_idx << std :: endl;
 
@@ -527,7 +595,7 @@ void PFVisualization::getLikelihood_2nd(const ObservedMarker& in_range_Marker)
 
         double w_dis = 1/(sqrt(2 * M_PI * Local_dis_))*exp(-((abs(Scan_distance_)-abs(particle_distance))*(abs(Scan_distance_)-abs(particle_distance)))/(2*Local_dis_))+1e-100; 
 
-        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(( Scan_angle_ - particle_angle ) * ( Scan_angle_ - particle_angle )) / (2 * ang_var_))+1e-100;
+        double w_ang =1/(sqrt(2 * M_PI * ang_var_))*exp(-(particle_angle * particle_angle) / (2 * ang_var_))+1e-100;
 
         if (Scan_distance_ == 0)
         {
@@ -550,7 +618,7 @@ void PFVisualization::getLikelihood_2nd(const ObservedMarker& in_range_Marker)
         double weight = exp(w_dis_log + w_ang_log);
 
         Likelihood_[j]*=weight;
-                
+        GA_Likelihood_txt << "尤度" << " " << Likelihood_[j] << std::endl;
     }
 }
 
@@ -560,37 +628,45 @@ void PFVisualization::getEstimatedRobotPose2(bool Localization_PF, double dt)
     est_msg.header.stamp = ros::Time::now();
     est_msg.header.frame_id = odom_msg_.header.frame_id;
     est_msg.child_frame_id = odom_msg_.child_frame_id;
+
     double PF_Estimate_position_x_ = 0.0;
     double PF_Estimate_position_y_ = 0.0;
-    double PF_Estimate_position_yaw_ = 0.0;
 
     if (Localization_PF) {
         // === PFで推定 ===
-        for (size_t j = 0; j < particles_.size(); ++j) {
-            PF_Estimate_position_x_   += particles_[j].x   * Likelihood_[j];
-            PF_Estimate_position_y_   += particles_[j].y   * Likelihood_[j];
-            PF_Estimate_position_yaw_ += particles_[j].yaw * Likelihood_[j];
+        double sin_sum = 0.0;
+        double cos_sum = 0.0;
+
+        for (size_t j = 0; j < particles_.size(); ++j) { 
+            Pt_Position << "Pt_X" << " " << particles_[j].x << " " << "Pt_Y" << " " << particles_[j].y << " " << "Pt_Yaw" << " "  << particles_[j].yaw << " " << std::endl;
+            PF_Estimate_position_x_ += particles_[j].x * Likelihood_[j];
+            PF_Estimate_position_y_ += particles_[j].y * Likelihood_[j];
+            sin_sum += std::sin(particles_[j].yaw) * Likelihood_[j];
+            cos_sum += std::cos(particles_[j].yaw) * Likelihood_[j];
         }
 
         est_robot_pose_x_ = PF_Estimate_position_x_;
         est_robot_pose_y_ = PF_Estimate_position_y_;
-        est_robot_pose_yaw_ = PF_Estimate_position_yaw_;
+        est_robot_pose_yaw_ = std::atan2(sin_sum, cos_sum);  // ベクトル平均で安定化
 
-        est_msg.pose.pose = potbot_lib::utility::get_pose(est_robot_pose_x_, est_robot_pose_y_, 0, 0, 0, est_robot_pose_yaw_);
+        est_msg.pose.pose = potbot_lib::utility::get_pose(
+            est_robot_pose_x_, est_robot_pose_y_, 0, 0, 0, est_robot_pose_yaw_);
 
         Estmate_Count_ += 1;
-        std::cout << "--- Localization by Particle Filter ---" << Estmate_Count_ <<  std::endl;
+        PF_Estimate_Count_ += 1;
+        ROS_INFO_STREAM("--- Localization by Particle Filter --- " << Estmate_Count_ << "--- PF_Estimate_count --- " <<  PF_Estimate_Count_);
 
     } else {
-        est_robot_pose_x_   += robot_dead_velocity_ * cos(est_robot_pose_yaw_) * dt;
-        est_robot_pose_y_   += robot_dead_velocity_ * sin(est_robot_pose_yaw_) * dt;
+        // === デッドレコニング ===
+        est_robot_pose_x_   += robot_dead_velocity_ * std::cos(est_robot_pose_yaw_) * dt;
+        est_robot_pose_y_   += robot_dead_velocity_ * std::sin(est_robot_pose_yaw_) * dt;
         est_robot_pose_yaw_ += robot_dead_angular_velocity_ * dt;
 
         est_msg.pose.pose = potbot_lib::utility::get_pose(
             est_robot_pose_x_, est_robot_pose_y_, 0, 0, 0, est_robot_pose_yaw_);
 
         Estmate_Count_ += 1;
-        std::cout << "--- Localization by Dead Reckoning --- " << Estmate_Count_ << std::endl;
+        ROS_INFO_STREAM("--- Localization by Dead Reckoning --- " << Estmate_Count_);
     }
 
     pub_estimated_robot_.publish(est_msg);
@@ -661,6 +737,7 @@ void PFVisualization::AdaptiveGeneticAlgorithm()
     double Pm = 0.5;  //突然変異確率(論文では0.5)
     double Tw = 0.001;  //有効サンプル数より決定される閾値
     double ESS_sum = 0.0;  //重みの2乗和
+    double GA_kakunin_Ess_sum = 0.0;
     double Effective_Sample_Size = 0.0;  //有効サンプル数
     int Count_CH = 0;
     int Count_CL = 0;
@@ -682,10 +759,13 @@ void PFVisualization::AdaptiveGeneticAlgorithm()
     
     for (const auto &p : particles_tmp) 
     {
+        GA_kakunin_Ess_sum += p.likelihood;
         ESS_sum += p.likelihood * p.likelihood;
     }
     
+    GA_kakunin_Ess_sum_txt << "合計" << GA_kakunin_Ess_sum << std::endl;
     Effective_Sample_Size = 1 / ESS_sum;
+    GA_Ess_txt << "Effective_Sample_Size_  " << Effective_Sample_Size << std::endl;
 
     size_t ess_index = static_cast<size_t>(Effective_Sample_Size);
     if (ess_index >= particles_tmp.size()) ess_index = particles_tmp.size() - 1;
@@ -731,7 +811,7 @@ void PFVisualization::AdaptiveGeneticAlgorithm()
              // CH からランダムに 1 つ抽出（削除はしない）
             p.particle.x = Am * p.particle.x + (1 - Am) * CH[idx].particle.x;
             p.particle.y = Am * p.particle.y + (1 - Am) * CH[idx].particle.y;
-            p.particle.yaw = Am * p.particle.yaw + (1 - Am) * CH[idx].particle.yaw;
+            p.particle.yaw = wrapAngle(Am * p.particle.yaw + (1 - Am) * CH[idx].particle.yaw);
         }
 
         CS.push_back(p);
@@ -758,7 +838,7 @@ void PFVisualization::AdaptiveGeneticAlgorithm()
             if (RL <= Pm){
                 p.particle.x = 2 * CH[idx].particle.x - p.particle.x;
                 p.particle.y = 2 * CH[idx].particle.y - p.particle.y;
-                p.particle.yaw = 2 * CH[idx].particle.yaw - p.particle.yaw;
+                p.particle.yaw = wrapAngle(2 * CH[idx].particle.yaw - p.particle.yaw);
             }else{
                 p.particle.x =  p.particle.x;
                 p.particle.y =  p.particle.y;
@@ -798,7 +878,8 @@ void PFVisualization::AdaptiveGeneticAlgorithm()
     {
         particles_[i].x   = CP[i].particle.x;
         particles_[i].y   = CP[i].particle.y;
-        particles_[i].yaw = CP[i].particle.yaw;
+        particles_[i].yaw = wrapAngle(CP[i].particle.yaw);
+        GA_Pt_Position << "Pt_X" << " " << particles_[i].x << " " << "Pt_Y" << " " << particles_[i].y << " " << "Pt_Yaw" << " "  << particles_[i].yaw << " " << std::endl;
     }
 }
 
@@ -861,14 +942,17 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
     step_sum_weight_.clear();
     double step_weight = 0.0;
     double ESS_sum = 0.0;
+    double kakunin_Ess_sum = 0.0;
     
     for (size_t i = 0; i < particles_.size(); ++i)
     {
+        kakunin_Ess_sum += Likelihood_[i];
         step_weight += Likelihood_[i];
         ESS_sum += Likelihood_[i] * Likelihood_[i];
         step_sum_weight_.push_back(step_weight);
     }
     
+    kakunin_Ess_sum_txt << "合計" << kakunin_Ess_sum << std::endl;
     double Effective_Sample_Size = 1.0 / ESS_sum;
     Ess_txt << "Effective_Sample_Size_  " << Effective_Sample_Size << std::endl;
     // ROS_INFO("Effective_Sample_Size_: %f", Effective_Sample_Size);
