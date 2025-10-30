@@ -36,9 +36,9 @@ class PFVisualization
 {
 private:
     ros::Subscriber sub_marker_, sub_robot_pose_, sub_particle_pose_, sub_robot_command_, sub_Dead_command_;
-    ros::Publisher pub_estimated_robot_, pub_particles_, pub_particles_state_,  pub_odom_encoder_;
+    ros::Publisher pub_estimated_robot_, pub_particles_, pub_particles_state_,  pub_odom_encoder_, pub_Review_robot_true_, pub_Review_robot_dead_;
 
-    nav_msgs::Odometry odom_msg_, odom_turu_msg_;
+    nav_msgs::Odometry odom_msg_, odom_turu_msg_, est_msg_, true_pose_msg_, dead_pose_msg_;
     std::vector<potbot_lib::DiffDriveAgent> particles_;
 
     //各記録用(ofstream定義)

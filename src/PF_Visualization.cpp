@@ -23,6 +23,8 @@ std::ofstream CP_Particle("/home/ros/catkin_ws/user/src/data/simulator/CP_Partic
 std::ofstream Marker_Scan("/home/ros/catkin_ws/user/src/data/simulator/Marker_Scan.txt");
 std::ofstream Likelihood_Scan("/home/ros/catkin_ws/user/src/data/simulator/Likelihood_Scan.txt");
 std::ofstream Element_yaw("/home/ros/catkin_ws/user/src/data/simulator/Element_yaw.txt");
+std::ofstream Element_Scan_yaw("/home/ros/catkin_ws/user/src/data/simulator/Element_scan_yaw.txt");
+std::ofstream Element_Scan_yaw_2nd("/home/ros/catkin_ws/user/src/data/simulator/Element_Scan_yaw_2nd.txt");
 
 
 int Pt_idx = 0;
@@ -48,6 +50,9 @@ PFVisualization::PFVisualization(/* args */)
     ros::NodeHandle nh;
 	pub_particles_ = nh.advertise<geometry_msgs::PoseArray>("particles", 1);
     pub_estimated_robot_ = nh.advertise<nav_msgs::Odometry>("odom/estimated", 1);
+    pub_Review_robot_true_ = nh.advertise<nav_msgs::Odometry>("odom/rev/true_pose", 1);
+    pub_Review_robot_dead_ = nh.advertise<nav_msgs::Odometry>("odom/rev/dead_pose", 1);
+
 
     // サブスクライバの作成
     sub_marker_ = nh.subscribe("marker", 1000, &PFVisualization::markerCallback,this);
@@ -94,6 +99,8 @@ void PFVisualization::robotCommandCallback(const nav_msgs::Odometry& odom_true_p
 {
     robot_velocity_ =  odom_true_pose.twist.twist.linear.x;
     robot_angular_velocity_ = odom_true_pose.twist.twist.angular.z;
+
+    true_pose_msg_ = odom_true_pose;
 }
 //ロボットのコールバック関数
 void PFVisualization::robotPoseCallback(const nav_msgs::Odometry& odom_pose)
@@ -117,6 +124,8 @@ void PFVisualization::robotDeadCallback(const nav_msgs::Odometry& odom_dead_pose
 {
     robot_dead_velocity_ = odom_dead_pose.twist.twist.linear.x;
     robot_dead_angular_velocity_ = odom_dead_pose.twist.twist.angular.z;
+
+    dead_pose_msg_ = odom_dead_pose;
 }
 
 void PFVisualization::localization()
@@ -159,25 +168,29 @@ void PFVisualization::localization()
             getObservedLandmark(observed_markers);
             initLiklihood();
             
+            Element_Scan_yaw << "---観測角度確認 開始---" << "実行回数" << Scan_Count_ << std::endl;
             Likelihood_Scan << "---Likelihood Scan 開始---" << "実行回数:" << Scan_Count_ << std::endl;
             for (const auto& in_range_Marker:observed_markers)
             {
                 getLikelihood_main(in_range_Marker);
             }
             Likelihood_Scan << "---Likelihood Scan 終了---" << std::endl;
+            Element_Scan_yaw << "観測角度確認終了" << std::endl;
 
             normLiklihood();
 
             getEstimatedRobotPose2(Localization_PF,dt);
 
-            // AdaptiveGeneticAlgorithm();
+            AdaptiveGeneticAlgorithm();
+            
+            Element_Scan_yaw_2nd << "---観測角度確認 開始---" << "実行回数" << Scan_Count_ << std::endl;
+            for (const auto& in_range_Marker:observed_markers)
+            {
+                getLikelihood_2nd(in_range_Marker);
+            }
+            Element_Scan_yaw_2nd << "観測角度確認終了" << std::endl;
 
-            // for (const auto& in_range_Marker:observed_markers)
-            // {
-            //     getLikelihood_2nd(in_range_Marker);
-            // }
-
-            // normLiklihood();
+            normLiklihood();
 
             getResamplingRobotPose1(step_sum_weight_);
             
@@ -493,10 +506,12 @@ void PFVisualization::getLikelihood_main(const ObservedMarker& in_range_Marker)
     const auto& marker = marker_positions_[in_range_Marker.id];
     double Scan_distance_ = in_range_Marker.distance;
     double Scan_angle_ = in_range_Marker.angle;
+    double particle_scan_sum = 0.0;
     double Pt_atan = 0.0;
     Pt_idx += 1;
 
     Likelihood_Scan << " マーカID: " << marker_ids_[in_range_Marker.id] << " スキャン距離: " << Scan_distance_ << " スキャン角度: " << Scan_angle_ << std::endl;
+    Element_Scan_yaw << "マーカID: " << marker_ids_[in_range_Marker.id] << " ロボット観測角度: " << Scan_angle_ ;
 
     for (size_t j = 0; j < particles_.size(); ++j)
     {
@@ -511,6 +526,7 @@ void PFVisualization::getLikelihood_main(const ObservedMarker& in_range_Marker)
         double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_);
         double particle_angle_atan = atan2(dis_Y_, dis_X_) - particle.yaw;
         double particle_angle = wrapAngle(Scan_angle_ - particle_angle_atan);
+        particle_scan_sum += particle_angle;
         
         Particle_angle <<  " マーカ番号 "  << marker_ids_[in_range_Marker.id] <<  " atan角度 "  << Pt_atan << " パーティクルID " << j <<  " パーティクル姿勢 "  << particle.yaw << " 計算後の尤度角度 "  << particle_angle << " 処理番号 " << Pt_idx << std :: endl;
 
@@ -536,10 +552,6 @@ void PFVisualization::getLikelihood_main(const ObservedMarker& in_range_Marker)
             w_dis = 1;
         }
         
-        if (Scan_angle_ == 0)
-        {
-            w_ang = 1;
-        }
 
         if (abs(abs(Scan_distance_)-abs(particle_distance))>1.3)
         {
@@ -554,6 +566,9 @@ void PFVisualization::getLikelihood_main(const ObservedMarker& in_range_Marker)
         Likelihood_[j]*=weight;
         Likelihood_txt << "尤度" << " " << Likelihood_[j] << std::endl;        
     }
+
+    double particle_scan_ave = particle_scan_sum / particles_.size(); 
+    Element_Scan_yaw << " パーティクル平均観測角度: " << particle_scan_ave << std::endl;
 }
 
 void PFVisualization::getLikelihood_2nd(const ObservedMarker& in_range_Marker)
@@ -561,8 +576,11 @@ void PFVisualization::getLikelihood_2nd(const ObservedMarker& in_range_Marker)
     const auto& marker = marker_positions_[in_range_Marker.id];
     double Scan_distance_ = in_range_Marker.distance;
     double Scan_angle_ = in_range_Marker.angle;
+    double particle_scan_sum = 0.0;
     double Pt_atan = 0.0;
     Pt_idx += 1;
+
+    Element_Scan_yaw_2nd << "マーカID: " << marker_ids_[in_range_Marker.id] << " ロボット観測角度: " << Scan_angle_ ;
 
     for (size_t j = 0; j < particles_.size(); ++j)
     {
@@ -577,6 +595,7 @@ void PFVisualization::getLikelihood_2nd(const ObservedMarker& in_range_Marker)
         double particle_distance = sqrt(dis_X_ * dis_X_ + dis_Y_ * dis_Y_);
         double particle_angle_atan = atan2(dis_Y_, dis_X_) - particle.yaw;
         double particle_angle = wrapAngle(Scan_angle_ - particle_angle_atan);
+        particle_scan_sum += particle_angle;
         
         Particle_angle_2nd <<  " マーカ番号 "  << marker_ids_[in_range_Marker.id] <<  " atan角度 "  << Pt_atan << " パーティクルID " << j <<  " パーティクル姿勢 "  << particle.yaw << " 計算後の尤度角度 "  << particle_angle << " 処理番号 " << Pt_idx << std :: endl;
 
@@ -602,10 +621,6 @@ void PFVisualization::getLikelihood_2nd(const ObservedMarker& in_range_Marker)
             w_dis = 1;
         }
         
-        if (Scan_angle_ == 0)
-        {
-            w_ang = 1;
-        }
 
         if (abs(abs(Scan_distance_)-abs(particle_distance))>1.3)
         {
@@ -620,6 +635,9 @@ void PFVisualization::getLikelihood_2nd(const ObservedMarker& in_range_Marker)
         Likelihood_[j]*=weight;
         GA_Likelihood_txt << "尤度" << " " << Likelihood_[j] << std::endl;
     }
+
+    double particle_scan_ave = particle_scan_sum / particles_.size();
+    Element_Scan_yaw_2nd << " パーティクル平均観測角度 " << std::endl;
 }
 
 void PFVisualization::getEstimatedRobotPose2(bool Localization_PF, double dt)
@@ -670,6 +688,13 @@ void PFVisualization::getEstimatedRobotPose2(bool Localization_PF, double dt)
     }
 
     pub_estimated_robot_.publish(est_msg);
+
+    true_pose_msg_.header.stamp = est_msg.header.stamp;
+    dead_pose_msg_.header.stamp = est_msg.header.stamp;
+
+    pub_Review_robot_true_.publish(true_pose_msg_);
+    pub_Review_robot_dead_.publish(dead_pose_msg_);
+    
 }
 
 //重みの最適化過程、自己位置推定過程、リサンプリング過程--------------------------------------------------------------------------------------------------------------------------------------------
@@ -713,6 +738,12 @@ void PFVisualization::getEstimatedRobotPose()
     est_msg.child_frame_id = odom_msg_.child_frame_id;
     est_msg.pose.pose = potbot_lib::utility::get_pose(smoothed_x, smoothed_y, 0, 0, 0, smoothed_yaw);
     pub_estimated_robot_.publish(est_msg);
+
+    true_pose_msg_.header.stamp = est_msg.header.stamp;
+    dead_pose_msg_.header.stamp = est_msg.header.stamp;
+
+    pub_Review_robot_true_.publish(true_pose_msg_);
+    pub_Review_robot_dead_.publish(dead_pose_msg_);
 }
 
 void PFVisualization::AdaptiveGeneticAlgorithm()

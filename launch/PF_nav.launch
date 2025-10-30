@@ -2,7 +2,7 @@
    <arg name="particle_num"                                    default="100"/>
 
    <group ns="PF_nav">
-      <node pkg="controller_tutorial" name="controller_tutorial_2" type="controller_tutorial_2" output="screen">
+      <node pkg="controller_tutorial" type="controller_tutorial_2" name="controller_tutorial_2" output="screen">
 
          <!-- 制御周期 Hz -->
          <param name="control_frequency"                       value="50.0"/>
@@ -26,7 +26,7 @@
          <param name="norm_noise_variance_linear_dead_velocity"     value="0.0000297694"/>
          <param name="norm_noise_mean_angular_dead_velocity"        value="0.0"/>
          <param name="norm_noise_variance_angular_dead_velocity"    value="0.00111064"/>
-
+         
          <!-- パーティクルの初期配置におけるノイズパラメータ --><!-- PF_navのpkgのみ(contoroller_tutorialにはなし) -->
          <param name="norm_noise_mean_initial_particle_X"      value="0.0"/>
          <param name="norm_noise_variance_initial_particle_X"  value="0.1"/>
@@ -34,7 +34,7 @@
          <param name="norm_noise_variance_initial_particle_Y"  value="0.1"/>
          <param name="norm_noise_mean_initial_particle_yaw"      value="0.0"/>
          <param name="norm_noise_variance_initial_particle_yaw"  value="0.1"/>
-         
+
          <!-- 移動制御のパラメータ -->
          <param name="gain_p"                                  value="1.0"/>
          <param name="gain_i"                                  value="0.1"/>
@@ -43,13 +43,32 @@
          <param name="stop_margin_distance"                    value="0.03"/>
          <param name="max_linear_velocity"                     value="0.25"/>
          <param name="max_angular_velocity"                    value="0.6"/>
+
+         <remap from="cmd_vel_keyboard" to="/PF_nav/cmd_vel_keyboard"/>
+         <remap from="cmd_vel_joy" to="/PF_nav/cmd_vel_joy"/>
       </node>
 
       <node pkg="PF_nav" name="PF_nav_MarkerArray_2" type="PF_nav_MarkerArray_2" output="screen">
          <rosparam command="load" file="$(find PF_nav)/yaml/markers_3.yaml"/>
       </node>
-     
-     <node pkg="PF_nav" name="PF_nav_Visualization" type="PF_nav_Visualization" output="screen">
+
+      <node pkg="controller_tutorial" type="teleop_keyboard" name="teleop_keyboard" output="screen">
+         <remap from="cmd_vel" to="/PF_nav/cmd_vel_keyboard"/>
+      </node>
+
+      <node pkg="joy" type="joy_node" name="joy_node" output="screen">
+      <param name="dev" value="/dev/input/js0"/>
+      <param name="deadzone" value="0.1"/>
+      <param name="autorepeat_rate" value="20"/>
+      <remap from="joy" to="/PF_nav/joy"/> <!-- 明示的にグローバル指定 -->
+      </node>
+      
+       <!-- teleop_twist_joy（/joy→/PF_nav/cmd_vel_joy） -->
+      <node pkg="controller_tutorial" type="teleop_joy" name="teleop_joy" output="screen">
+         <remap from="cmd_vel" to="/PF_nav/cmd_vel_joy"/>
+      </node>
+
+      <node pkg="PF_nav" name="PF_nav_Visualization" type="PF_nav_Visualization" output="screen">
          <!-- <param name="particle_num"                            value="$(arg particle_num)"/> -->
 
          <!-- 生成するパーティクル数 -->
@@ -74,11 +93,8 @@
          <param name="norm_noise_variance_Scan_angle"    value="0.00464"/>
          <param name="norm_noise_mean_Scan_Long_distance"        value="1.37"/>
          <param name="norm_noise_variance_Scan_Long_distance"    value="0.0138"/>
-     </node>
+      </node>
 
       <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find PF_nav)/rviz/PF_nav.rviz"/>
-
-      <node pkg="PF_nav" name="PF_nav_keyboard" type="PF_nav_keyboard" output="screen"/>
-
    </group>
 </launch>
