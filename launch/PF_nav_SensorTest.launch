@@ -40,10 +40,10 @@
       </node>
 
       <node pkg="PF_nav" name="PF_nav_MarkerArray_2" type="PF_nav_MarkerArray_2" output="screen">
-         <rosparam command="load" file="$(find PF_nav)/yaml/markers_3.yaml"/>
+         <rosparam command="load" file="$(find PF_nav)/yaml/Sensor_test.yaml"/>
       </node>
       
-      <node pkg="PF_nav" name="PF_nav_SensorTest" type="PF_nav_SensorTest" output="screen"/>
+      <node pkg="PF_nav" name="PF_nav_SensorModelTest" type="PF_nav_SensorModelTest" output="screen"/>
 
       <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find PF_nav)/rviz/PF_nav.rviz"/>
 

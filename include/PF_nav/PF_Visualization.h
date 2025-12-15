@@ -109,7 +109,7 @@ public:
     void initLiklihood();
     void normLiklihood(); 
     void getObservedLandmark(std::vector<ObservedMarker>& observed_markers);
-    void getLikelihood(size_t marker_id);
+    void getLikelihood(const ObservedMarker& in_range_Marker);
     void getLikelihood_main(const ObservedMarker& in_range_Marker);
     void getLikelihood_2nd(const ObservedMarker& in_range_Marker);
     void getEstimatedRobotPose();
@@ -119,6 +119,8 @@ public:
     void getResamplingRobotPose0();
     void getResamplingRobotPose1(std::vector<double>& step_sum_weight_);
     void getResamplingRobotPose2(std::vector<double>& step_sum_weight_);
+    void SensorNoiseModel();
+
 
     double wrapAngle(double angle);
 };

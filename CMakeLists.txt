@@ -44,4 +44,7 @@ target_link_libraries(${PROJECT_NAME}_keyboard ${catkin_LIBRARIES})
 add_executable(${PROJECT_NAME}_SensorTest src/PF_SensorTest.cpp)
 target_link_libraries(${PROJECT_NAME}_SensorTest ${catkin_LIBRARIES})
 
+add_executable(${PROJECT_NAME}_SensorModelTest src/PF_SensorModelTest.cpp)
+target_link_libraries(${PROJECT_NAME}_SensorModelTest ${catkin_LIBRARIES})
+
 add_definitions(-std=c++14)

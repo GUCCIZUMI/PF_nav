@@ -2,7 +2,7 @@
    <arg name="particle_num"                                    default="100"/>
 
    <group ns="PF_nav">
-      <node pkg="controller_tutorial" type="multi_teleop2" name="multi_teleop2" output="screen">
+      <node pkg="controller_tutorial" type="controller_tutorial_2" name="controller_tutorial_2" output="screen">
 
          <!-- 制御周期 Hz -->
          <param name="control_frequency"                       value="50.0"/>
