@@ -172,7 +172,7 @@ void PFVisualization::localization()
             Likelihood_Scan << "---Likelihood Scan 開始---" << "実行回数:" << Scan_Count_ << std::endl;
             for (const auto& in_range_Marker:observed_markers)
             {
-                getLikelihood_main(in_range_Marker);
+                getLikelihood(in_range_Marker);
             }
             Likelihood_Scan << "---Likelihood Scan 終了---" << std::endl;
             Element_Scan_yaw << "観測角度確認終了" << std::endl;
@@ -181,16 +181,16 @@ void PFVisualization::localization()
 
             getEstimatedRobotPose2(Localization_PF,dt);
 
-            AdaptiveGeneticAlgorithm();
+            // AdaptiveGeneticAlgorithm();
             
-            Element_Scan_yaw_2nd << "---観測角度確認 開始---" << "実行回数" << Scan_Count_ << std::endl;
-            for (const auto& in_range_Marker:observed_markers)
-            {
-                getLikelihood_2nd(in_range_Marker);
-            }
-            Element_Scan_yaw_2nd << "観測角度確認終了" << std::endl;
+            // Element_Scan_yaw_2nd << "---観測角度確認 開始---" << "実行回数" << Scan_Count_ << std::endl;
+            // for (const auto& in_range_Marker:observed_markers)
+            // {
+            //     getLikelihood_2nd(in_range_Marker);
+            // }
+            // Element_Scan_yaw_2nd << "観測角度確認終了" << std::endl;
 
-            normLiklihood();
+            // normLiklihood();
 
             getResamplingRobotPose1(step_sum_weight_);
             
@@ -1011,8 +1011,8 @@ void PFVisualization::getResamplingRobotPose1(std::vector<double>& step_sum_weig
         }
 
         // --- 4. ノイズ付与（全パーティクル） ---
-        double linear_var = 0.01;
-        double angular_var = 0.01;
+        double linear_var = 0.001;
+        double angular_var = 0.001;
         std::normal_distribution<double> dist_linear(0.0, sqrt(linear_var));
         std::normal_distribution<double> dist_angular(0.0, sqrt(angular_var));
 
